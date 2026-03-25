@@ -16,6 +16,7 @@ import { IWorkspaceContextService } from '../../../../platform/workspace/common/
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { URI } from '../../../../base/common/uri.js';
+import { VSBuffer } from '../../../../base/common/buffer.js';
 
 interface DevClawAgentDef {
 	id: string;
@@ -276,7 +277,8 @@ export class DevClawAgentRegistration extends Disposable {
 			// All DevClaw agents route through ctrl-a on the backend
 			const ctrlAAgentId = 'ctrl-a';
 			const roleContext = persona ? `[Respond as ${def.fullName}: ${persona}]\n\n` : '';
-			const fullMessage = roleContext + message + localContext;
+			const capabilities = `[DEVCLAW IDE CAPABILITIES: You ARE running inside DevClaw IDE. You CAN create and edit files. When the user asks you to create or modify a file, respond with the full file content in a markdown code block with the filename as the language tag, like:\n\`\`\`path/to/file.ts\nfile content here\n\`\`\`\nThe user can click Apply to write it to disk. You CAN see the workspace files. You have full local context. Act like you have filesystem access — because DevClaw handles it for you.]\n\n`;
+			const fullMessage = roleContext + capabilities + message + localContext;
 
 			const controller = new AbortController();
 			token.onCancellationRequested(() => controller.abort());
@@ -302,10 +304,29 @@ export class DevClawAgentRegistration extends Disposable {
 			const data = await res.json();
 			const response = data.response || data.message || 'No response from agent.';
 
+			// Send the markdown response
 			progress([{
 				kind: 'markdownContent',
 				content: new MarkdownString(response),
 			}]);
+
+			// Auto-detect code blocks with file paths and create/update files
+			const createdFiles = await this.autoApplyCodeBlocks(response);
+			if (createdFiles.length > 0) {
+				const fileLinks = createdFiles.map(f => `- [${f.path}](${f.uri.toString()})`).join('\n');
+				progress([{
+					kind: 'markdownContent',
+					content: new MarkdownString(
+						`\n\n---\n**Files ${createdFiles.some(f => f.created) ? 'created' : 'updated'}:**\n${fileLinks}`,
+						{ isTrusted: true }
+					),
+				}]);
+
+				// Open the first created file in the editor
+				if (createdFiles.length > 0) {
+					await this.editorService.openEditor({ resource: createdFiles[0].uri });
+				}
+			}
 
 			return { metadata: {} };
 		} catch (err) {
@@ -319,5 +340,40 @@ export class DevClawAgentRegistration extends Disposable {
 			}]);
 			return { metadata: {} };
 		}
+	}
+
+	/**
+	 * Parses agent response for code blocks with file path language tags.
+	 * Auto-creates/updates files and returns info about what was created.
+	 */
+	private async autoApplyCodeBlocks(response: string): Promise<{ path: string; uri: URI; created: boolean }[]> {
+		const results: { path: string; uri: URI; created: boolean }[] = [];
+		const folders = this.workspaceService.getWorkspace().folders;
+		if (folders.length === 0) {
+			return results;
+		}
+
+		const codeBlockRegex = /```([\w./\\-]+\.[\w]+)\n([\s\S]*?)```/g;
+		let match;
+		while ((match = codeBlockRegex.exec(response)) !== null) {
+			const filePath = match[1];
+			const content = match[2];
+
+			const skipTags = ['typescript', 'javascript', 'python', 'bash', 'shell', 'json', 'html', 'css', 'markdown', 'sql', 'yaml', 'toml', 'xml', 'rust', 'go', 'java', 'cpp', 'ruby', 'php', 'swift', 'kotlin', 'dart', 'text', 'txt', 'diff', 'log'];
+			if (skipTags.includes(filePath.toLowerCase())) {
+				continue;
+			}
+
+			try {
+				const fileUri = URI.joinPath(folders[0].uri, filePath);
+				const exists = await this.fileService.exists(fileUri);
+				await this.fileService.writeFile(fileUri, VSBuffer.fromString(content));
+				results.push({ path: filePath, uri: fileUri, created: !exists });
+			} catch {
+				// Skip files we can't write
+			}
+		}
+
+		return results;
 	}
 }
