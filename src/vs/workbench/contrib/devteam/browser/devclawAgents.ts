@@ -179,7 +179,12 @@ export class DevClawAgentRegistration extends Disposable {
 		}
 
 		try {
-			const agentId = def.name;
+			// All DevClaw agents route through ctrl-a on the backend
+			// The persona context tells ctrl-a how to respond
+			const ctrlAAgentId = 'ctrl-a';
+			const roleContext = persona ? `[Respond as ${def.fullName}: ${persona}]\n\n` : '';
+			const fullMessage = roleContext + message;
+
 			const controller = new AbortController();
 			token.onCancellationRequested(() => controller.abort());
 
@@ -189,7 +194,7 @@ export class DevClawAgentRegistration extends Disposable {
 					'Content-Type': 'application/json',
 					'x-api-key': apiKey,
 				},
-				body: JSON.stringify({ message, agentId }),
+				body: JSON.stringify({ message: fullMessage, agentId: ctrlAAgentId }),
 				signal: controller.signal,
 			});
 

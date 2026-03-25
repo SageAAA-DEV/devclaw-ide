@@ -23,11 +23,18 @@ export class DevTeamSettingsPane extends ViewPane {
 		ctrlAUrl: 'devteam.ctrlA.url',
 		ctrlAMode: 'devteam.ctrlA.mode',
 		ctrlAApiKey: 'devteam.ctrlA.apiKey',
+		ctrlACloudUrl: 'devteam.ctrlA.cloudUrl',
+		ctrlACloudApiKey: 'devteam.ctrlA.cloudApiKey',
+		ctrlALocalUrl: 'devteam.ctrlA.localUrl',
+		ctrlALocalApiKey: 'devteam.ctrlA.localApiKey',
 		keyAnthropic: 'devteam.key.anthropic',
 		keyOpenAI: 'devteam.key.openai',
 		keyMiniMax: 'devteam.key.minimax',
 		keyOpenRouter: 'devteam.key.openrouter',
 	};
+
+	private urlInput!: HTMLInputElement;
+	private apiKeyInput!: HTMLInputElement;
 
 	constructor(
 		options: IViewPaneOptions,
@@ -65,10 +72,18 @@ export class DevTeamSettingsPane extends ViewPane {
 		content.className = 'devteam-settings';
 
 		// --- Section: CTRL-A Instance ---
+		const urlRow = this.createInput('Server URL', 'ctrlAUrl', 'https://your-ctrl-a.onrender.com', 'text');
+		this.urlInput = urlRow.querySelector('.devteam-settings-input') as HTMLInputElement;
+
+		const apiKeyRow = this.createInput('API Key', 'ctrlAApiKey', 'Enter CTRL-A API key', 'password');
+		this.apiKeyInput = apiKeyRow.querySelector('.devteam-settings-input') as HTMLInputElement;
+
+		const modeToggle = this.createModeToggle();
+
 		content.appendChild(this.createSection('CTRL-A Instance', [
-			this.createToggle('Mode', 'ctrlAMode', ['cloud', 'local'], 'cloud'),
-			this.createInput('Server URL', 'ctrlAUrl', 'https://your-ctrl-a.onrender.com', 'text'),
-			this.createInput('API Key', 'ctrlAApiKey', 'Enter CTRL-A API key', 'password'),
+			modeToggle,
+			urlRow,
+			apiKeyRow,
 			this.createTestButton(),
 		]));
 
@@ -147,36 +162,6 @@ export class DevTeamSettingsPane extends ViewPane {
 		return row;
 	}
 
-	private createToggle(label: string, storageKey: keyof typeof this.STORAGE_KEYS, options: string[], defaultVal: string): HTMLElement {
-		const row = document.createElement('div');
-		row.className = 'devteam-settings-row';
-
-		const labelEl = document.createElement('label');
-		labelEl.className = 'devteam-settings-label';
-		labelEl.textContent = label;
-		row.appendChild(labelEl);
-
-		const toggleContainer = document.createElement('div');
-		toggleContainer.className = 'devteam-toggle-container';
-
-		const saved = this.storageService.get(this.STORAGE_KEYS[storageKey], StorageScope.APPLICATION, defaultVal);
-
-		for (const opt of options) {
-			const btn = document.createElement('button');
-			btn.className = `devteam-toggle-btn ${saved === opt ? 'active' : ''}`;
-			btn.textContent = opt.charAt(0).toUpperCase() + opt.slice(1);
-			btn.addEventListener('click', () => {
-				toggleContainer.querySelectorAll('.devteam-toggle-btn').forEach(b => b.classList.remove('active'));
-				btn.classList.add('active');
-				this.storageService.store(this.STORAGE_KEYS[storageKey], opt, StorageScope.APPLICATION, StorageTarget.USER);
-			});
-			toggleContainer.appendChild(btn);
-		}
-
-		row.appendChild(toggleContainer);
-		return row;
-	}
-
 	private createTestButton(): HTMLElement {
 		const row = document.createElement('div');
 		row.className = 'devteam-settings-row';
@@ -204,7 +189,12 @@ export class DevTeamSettingsPane extends ViewPane {
 			}
 
 			try {
-				const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(5000) });
+				// Use Electron's net module to bypass CORS restrictions
+				const electronFetch = (globalThis as any).fetch;
+				const res = await electronFetch(`${url}/api/health`, {
+					signal: AbortSignal.timeout(10000),
+					headers: { 'x-api-key': this.storageService.get(this.STORAGE_KEYS.ctrlAApiKey, StorageScope.APPLICATION, '') },
+				});
 				if (res.ok) {
 					const data = await res.json();
 					status.textContent = `Connected — v${data.version || '?'}`;
@@ -224,6 +214,68 @@ export class DevTeamSettingsPane extends ViewPane {
 
 		row.appendChild(btn);
 		row.appendChild(status);
+		return row;
+	}
+
+	private createModeToggle(): HTMLElement {
+		const row = document.createElement('div');
+		row.className = 'devteam-settings-row';
+
+		const labelEl = document.createElement('label');
+		labelEl.className = 'devteam-settings-label';
+		labelEl.textContent = 'Mode';
+		row.appendChild(labelEl);
+
+		const toggleContainer = document.createElement('div');
+		toggleContainer.className = 'devteam-toggle-container';
+
+		const currentMode = this.storageService.get(this.STORAGE_KEYS.ctrlAMode, StorageScope.APPLICATION, 'cloud');
+
+		for (const opt of ['cloud', 'local']) {
+			const btn = document.createElement('button');
+			btn.className = `devteam-toggle-btn ${currentMode === opt ? 'active' : ''}`;
+			btn.textContent = opt.charAt(0).toUpperCase() + opt.slice(1);
+			btn.addEventListener('click', () => {
+				// Save current values to the current mode's storage
+				const oldMode = this.storageService.get(this.STORAGE_KEYS.ctrlAMode, StorageScope.APPLICATION, 'cloud');
+				if (oldMode === 'cloud') {
+					this.storageService.store(this.STORAGE_KEYS.ctrlACloudUrl, this.urlInput.value, StorageScope.APPLICATION, StorageTarget.USER);
+					this.storageService.store(this.STORAGE_KEYS.ctrlACloudApiKey, this.apiKeyInput.value, StorageScope.APPLICATION, StorageTarget.USER);
+				} else {
+					this.storageService.store(this.STORAGE_KEYS.ctrlALocalUrl, this.urlInput.value, StorageScope.APPLICATION, StorageTarget.USER);
+					this.storageService.store(this.STORAGE_KEYS.ctrlALocalApiKey, this.apiKeyInput.value, StorageScope.APPLICATION, StorageTarget.USER);
+				}
+
+				// Switch mode
+				this.storageService.store(this.STORAGE_KEYS.ctrlAMode, opt, StorageScope.APPLICATION, StorageTarget.USER);
+				toggleContainer.querySelectorAll('.devteam-toggle-btn').forEach(b => b.classList.remove('active'));
+				btn.classList.add('active');
+
+				// Load the new mode's values
+				if (opt === 'cloud') {
+					const cloudUrl = this.storageService.get(this.STORAGE_KEYS.ctrlACloudUrl, StorageScope.APPLICATION, '');
+					const cloudKey = this.storageService.get(this.STORAGE_KEYS.ctrlACloudApiKey, StorageScope.APPLICATION, '');
+					this.urlInput.value = cloudUrl;
+					this.urlInput.placeholder = 'https://your-ctrl-a.onrender.com';
+					this.apiKeyInput.value = cloudKey;
+					// Update the active URL/key storage
+					this.storageService.store(this.STORAGE_KEYS.ctrlAUrl, cloudUrl, StorageScope.APPLICATION, StorageTarget.USER);
+					this.storageService.store(this.STORAGE_KEYS.ctrlAApiKey, cloudKey, StorageScope.APPLICATION, StorageTarget.USER);
+				} else {
+					const localUrl = this.storageService.get(this.STORAGE_KEYS.ctrlALocalUrl, StorageScope.APPLICATION, 'http://localhost:1045');
+					const localKey = this.storageService.get(this.STORAGE_KEYS.ctrlALocalApiKey, StorageScope.APPLICATION, 'dev-key');
+					this.urlInput.value = localUrl;
+					this.urlInput.placeholder = 'http://localhost:1045';
+					this.apiKeyInput.value = localKey;
+					// Update the active URL/key storage
+					this.storageService.store(this.STORAGE_KEYS.ctrlAUrl, localUrl, StorageScope.APPLICATION, StorageTarget.USER);
+					this.storageService.store(this.STORAGE_KEYS.ctrlAApiKey, localKey, StorageScope.APPLICATION, StorageTarget.USER);
+				}
+			});
+			toggleContainer.appendChild(btn);
+		}
+
+		row.appendChild(toggleContainer);
 		return row;
 	}
 
