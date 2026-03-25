@@ -12,6 +12,10 @@ import { IStorageService, StorageScope } from '../../../../platform/storage/comm
 import { CancellationToken } from '../../../../base/common/cancellation.js';
 import { ExtensionIdentifier } from '../../../../platform/extensions/common/extensions.js';
 import { MarkdownString } from '../../../../base/common/htmlContent.js';
+import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
+import { IEditorService } from '../../../services/editor/common/editorService.js';
+import { IFileService } from '../../../../platform/files/common/files.js';
+import { URI } from '../../../../base/common/uri.js';
 
 interface DevClawAgentDef {
 	id: string;
@@ -96,6 +100,9 @@ export class DevClawAgentRegistration extends Disposable {
 	constructor(
 		@IChatAgentService private readonly chatAgentService: IChatAgentService,
 		@IStorageService private readonly storageService: IStorageService,
+		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
+		@IEditorService private readonly editorService: IEditorService,
+		@IFileService private readonly fileService: IFileService,
 	) {
 		super();
 		this.registerAllAgents();
@@ -148,6 +155,90 @@ export class DevClawAgentRegistration extends Disposable {
 		this._register(reg);
 	}
 
+	/**
+	 * Gathers local workspace context:
+	 * - Workspace folder name and key files
+	 * - Currently open file content
+	 * - Reads any file paths mentioned in the message
+	 */
+	private async gatherLocalContext(message: string): Promise<string> {
+		const contextParts: string[] = [];
+
+		// 1. Workspace info
+		const folders = this.workspaceService.getWorkspace().folders;
+		if (folders.length > 0) {
+			const folder = folders[0];
+			const folderName = folder.name;
+			contextParts.push(`[Workspace: ${folderName} at ${folder.uri.fsPath}]`);
+
+			// Try to read key project files for context
+			for (const keyFile of ['package.json', 'README.md', 'CLAUDE.md']) {
+				try {
+					const fileUri = URI.joinPath(folder.uri, keyFile);
+					const exists = await this.fileService.exists(fileUri);
+					if (exists) {
+						const content = await this.fileService.readFile(fileUri);
+						const text = content.value.toString();
+						// Limit to first 500 chars for context
+						contextParts.push(`[File: ${keyFile}]\n${text.substring(0, 500)}${text.length > 500 ? '\n...(truncated)' : ''}`);
+					}
+				} catch {
+					// Skip files we can't read
+				}
+			}
+		}
+
+		// 2. Currently open/active file
+		const activeEditor = this.editorService.activeTextEditorControl;
+		const activeResource = this.editorService.activeEditor?.resource;
+		if (activeEditor && activeResource) {
+			const model = activeEditor.getModel?.();
+			if (model && 'getValue' in model) {
+				const content = (model as { getValue(): string }).getValue();
+				const fileName = activeResource.path.split('/').pop() || 'unknown';
+				// Limit to 2000 chars
+				contextParts.push(`[Active file: ${fileName} (${activeResource.fsPath})]\n${content.substring(0, 2000)}${content.length > 2000 ? '\n...(truncated)' : ''}`);
+			}
+		}
+
+		// 3. Detect file paths in the message and read them
+		const pathPatterns = [
+			/([A-Za-z]:\\[^\s"']+)/g,           // Windows paths: C:\Users\...
+			/(\/[^\s"']+\.[a-zA-Z]{1,10})/g,     // Unix paths: /home/user/file.ts
+			/(?:^|\s)([\w.-]+\.(?:ts|js|json|md|py|html|css|tsx|jsx|yaml|yml|toml))/g,  // Relative filenames
+		];
+
+		for (const pattern of pathPatterns) {
+			const matches = message.matchAll(pattern);
+			for (const match of matches) {
+				const filePath = match[1];
+				try {
+					let fileUri: URI;
+					if (filePath.match(/^[A-Za-z]:\\/)) {
+						fileUri = URI.file(filePath);
+					} else if (filePath.startsWith('/')) {
+						fileUri = URI.file(filePath);
+					} else if (folders.length > 0) {
+						fileUri = URI.joinPath(folders[0].uri, filePath);
+					} else {
+						continue;
+					}
+
+					const exists = await this.fileService.exists(fileUri);
+					if (exists) {
+						const content = await this.fileService.readFile(fileUri);
+						const text = content.value.toString();
+						contextParts.push(`[Referenced file: ${filePath}]\n${text.substring(0, 3000)}${text.length > 3000 ? '\n...(truncated)' : ''}`);
+					}
+				} catch {
+					// Skip files we can't read
+				}
+			}
+		}
+
+		return contextParts.length > 0 ? '\n\n---\n[LOCAL CONTEXT FROM DEVCLAW IDE]\n' + contextParts.join('\n\n') : '';
+	}
+
 	private async handleRequest(
 		def: DevClawAgentDef,
 		request: IChatAgentRequest,
@@ -179,11 +270,13 @@ export class DevClawAgentRegistration extends Disposable {
 		}
 
 		try {
+			// Gather local workspace context (files, active editor, referenced paths)
+			const localContext = await this.gatherLocalContext(message);
+
 			// All DevClaw agents route through ctrl-a on the backend
-			// The persona context tells ctrl-a how to respond
 			const ctrlAAgentId = 'ctrl-a';
 			const roleContext = persona ? `[Respond as ${def.fullName}: ${persona}]\n\n` : '';
-			const fullMessage = roleContext + message;
+			const fullMessage = roleContext + message + localContext;
 
 			const controller = new AbortController();
 			token.onCancellationRequested(() => controller.abort());
