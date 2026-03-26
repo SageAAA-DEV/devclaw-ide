@@ -75,6 +75,65 @@ export class CtrlAClient {
 		return this.post<ChatResponse>('/api/chat', body);
 	}
 
+	async chatStream(agentId: string, message: string, onChunk: (text: string) => void): Promise<string> {
+		const res = await fetch(`${this.config.baseUrl}/api/chat/stream`, {
+			method: 'POST',
+			headers: { ...this.headers(), 'Content-Type': 'application/json' },
+			body: JSON.stringify({ message, agentId }),
+		});
+
+		if (!res.ok) {
+			throw new Error(`CTRL-A API error: ${res.status} ${res.statusText}`);
+		}
+
+		// Try streaming first, fall back to regular JSON response
+		if (!res.body) {
+			const data = await res.json();
+			const content = data.response || data.message || '';
+			onChunk(content);
+			return content;
+		}
+
+		const reader = res.body.getReader();
+		const decoder = new TextDecoder();
+		let fullResponse = '';
+
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) {
+				break;
+			}
+
+			const chunk = decoder.decode(value, { stream: true });
+			// Handle SSE format: lines starting with "data: "
+			const lines = chunk.split('\n');
+			for (const line of lines) {
+				if (line.startsWith('data: ')) {
+					const data = line.slice(6).trim();
+					if (data === '[DONE]') {
+						continue;
+					}
+					try {
+						const parsed = JSON.parse(data);
+						const text = parsed.delta || parsed.content || parsed.text || data;
+						fullResponse += text;
+						onChunk(text);
+					} catch {
+						// Plain text chunk
+						fullResponse += data;
+						onChunk(data);
+					}
+				} else if (line.trim() && !line.startsWith(':')) {
+					// Non-SSE plain text streaming
+					fullResponse += line;
+					onChunk(line);
+				}
+			}
+		}
+
+		return fullResponse;
+	}
+
 	async listAgents(): Promise<AgentInfo[]> {
 		return this.get<AgentInfo[]>('/api/agents');
 	}

@@ -17,6 +17,7 @@ import { IEditorService } from '../../../services/editor/common/editorService.js
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { URI } from '../../../../base/common/uri.js';
 import { VSBuffer } from '../../../../base/common/buffer.js';
+import { CtrlAClient } from '../common/ctrlAClient.js';
 
 interface DevClawAgentDef {
 	id: string;
@@ -283,35 +284,47 @@ export class DevClawAgentRegistration extends Disposable {
 			const controller = new AbortController();
 			token.onCancellationRequested(() => controller.abort());
 
-			const res = await fetch(`${url}/api/chat`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'x-api-key': apiKey,
-				},
-				body: JSON.stringify({ message: fullMessage, agentId: ctrlAAgentId }),
-				signal: controller.signal,
-			});
+			// Try streaming endpoint first, fall back to blocking fetch
+			let streamedResponse = '';
+			const client = new CtrlAClient({ baseUrl: url, apiKey: apiKey });
 
-			if (!res.ok) {
+			try {
+				streamedResponse = await client.chatStream(ctrlAAgentId, fullMessage, (chunk) => {
+					progress([{
+						kind: 'markdownContent',
+						content: new MarkdownString(chunk),
+					}]);
+				});
+			} catch {
+				// Fall back to blocking fetch if streaming endpoint not available
+				const res = await fetch(`${url}/api/chat`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'x-api-key': apiKey,
+					},
+					body: JSON.stringify({ message: fullMessage, agentId: ctrlAAgentId }),
+					signal: controller.signal,
+				});
+
+				if (!res.ok) {
+					progress([{
+						kind: 'markdownContent',
+						content: new MarkdownString(`**Error:** CTRL-A returned ${res.status} ${res.statusText}`),
+					}]);
+					return { metadata: {} };
+				}
+
+				const data = await res.json();
+				streamedResponse = data.response || data.message || 'No response from agent.';
 				progress([{
 					kind: 'markdownContent',
-					content: new MarkdownString(`**Error:** CTRL-A returned ${res.status} ${res.statusText}`),
+					content: new MarkdownString(streamedResponse),
 				}]);
-				return { metadata: {} };
 			}
 
-			const data = await res.json();
-			const response = data.response || data.message || 'No response from agent.';
-
-			// Send the markdown response
-			progress([{
-				kind: 'markdownContent',
-				content: new MarkdownString(response),
-			}]);
-
 			// Auto-detect code blocks with file paths and create/update files
-			const createdFiles = await this.autoApplyCodeBlocks(response);
+			const createdFiles = await this.autoApplyCodeBlocks(streamedResponse);
 			if (createdFiles.length > 0) {
 				const fileLinks = createdFiles.map(f => `- [${f.path}](${f.uri.toString()})`).join('\n');
 				progress([{

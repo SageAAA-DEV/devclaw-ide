@@ -29,6 +29,7 @@ export interface IDevClawService {
 	// Actions
 	selectAgent(agentId: string): void;
 	sendMessage(message: string): Promise<ChatResponse | null>;
+	sendMessageStream(message: string, onChunk: (text: string) => void): Promise<string | null>;
 	sendMessageWithContext(message: string, context: string, filePath?: string): Promise<ChatResponse | null>;
 	reconnect(): void;
 	getClient(): CtrlAClient;
@@ -110,6 +111,34 @@ export class DevClawService extends Disposable implements IDevClawService {
 			this._onChatMessage.fire({
 				role: 'assistant',
 				content: response.response,
+				agentId: this._selectedAgentId,
+			});
+			return response;
+		} catch (err) {
+			this._onChatMessage.fire({
+				role: 'system',
+				content: `Error: ${err instanceof Error ? err.message : String(err)}`,
+			});
+			return null;
+		}
+	}
+
+	async sendMessageStream(message: string, onChunk: (text: string) => void): Promise<string | null> {
+		this._onChatMessage.fire({ role: 'user', content: message });
+
+		if (!this._isConnected) {
+			this._onChatMessage.fire({
+				role: 'system',
+				content: 'Not connected to CTRL-A. Configure your connection in DevClaw Settings.',
+			});
+			return null;
+		}
+
+		try {
+			const response = await this.client.chatStream(this._selectedAgentId, message, onChunk);
+			this._onChatMessage.fire({
+				role: 'assistant',
+				content: response,
 				agentId: this._selectedAgentId,
 			});
 			return response;

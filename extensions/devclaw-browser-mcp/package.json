@@ -1,0 +1,45 @@
+{
+	"name": "devclaw-browser-mcp",
+	"displayName": "DevClaw Browser Tools",
+	"description": "Built-in browser automation for DevClaw agents. Inspect pages, check console, take screenshots.",
+	"version": "0.1.0",
+	"publisher": "sageaaa",
+	"license": "Proprietary",
+	"engines": {
+		"vscode": "^1.114.0"
+	},
+	"activationEvents": [
+		"onStartupFinished"
+	],
+	"main": "./dist/extension.js",
+	"contributes": {
+		"commands": [
+			{
+				"command": "devclaw.browser.open",
+				"title": "Open Browser Preview"
+			},
+			{
+				"command": "devclaw.browser.screenshot",
+				"title": "Take Browser Screenshot"
+			},
+			{
+				"command": "devclaw.browser.console",
+				"title": "Show Browser Console Logs"
+			}
+		],
+		"configuration": {
+			"title": "DevClaw Browser",
+			"properties": {
+				"devclaw.browser.defaultUrl": {
+					"type": "string",
+					"default": "http://localhost:3000",
+					"description": "Default URL to open in the browser preview"
+				}
+			}
+		}
+	},
+	"scripts": {
+		"compile": "tsc -p tsconfig.json",
+		"watch": "tsc -watch -p tsconfig.json"
+	}
+}
