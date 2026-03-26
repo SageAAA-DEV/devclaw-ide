@@ -15,6 +15,7 @@ import { Codicon } from '../../../../base/common/codicons.js';
 import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
 import './devclawService.js'; // registers the singleton
+import './privacyConsent.js'; // Privacy consent dialog on first launch
 
 // --- Register CTRL-A agents as native chat participants ---
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
