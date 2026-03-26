@@ -16,6 +16,7 @@ import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js'
 import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
 import './devclawService.js'; // registers the singleton
 import './privacyConsent.js'; // Privacy consent dialog on first launch
+import './settingsImport.js'; // Settings import commands for VS Code, Cursor, Windsurf, Antigravity
 
 // --- Register CTRL-A agents as native chat participants ---
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
@@ -126,3 +127,15 @@ function registerAgentCommand(id: string, label: string, promptPrefix: string) {
 registerAgentCommand('devteam.askAgent', 'Ask Agent', '');
 registerAgentCommand('devteam.explainThis', 'Explain This', 'Explain this code:\n\n');
 registerAgentCommand('devteam.refactorThis', 'Refactor This', 'Refactor this code:\n\n');
+
+// --- Settings Import Commands (Command Palette) ---
+for (const [id, title] of [
+	['devteam.importVSCodeSettings', 'DevClaw: Import VS Code Settings'],
+	['devteam.importCursorSettings', 'DevClaw: Import Cursor Settings'],
+	['devteam.importWindsurfSettings', 'DevClaw: Import Windsurf Settings'],
+	['devteam.importAntigravitySettings', 'DevClaw: Import Antigravity Settings'],
+] as const) {
+	MenuRegistry.appendMenuItem(MenuId.CommandPalette, {
+		command: { id, title },
+	});
+}
