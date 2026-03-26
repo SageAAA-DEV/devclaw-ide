@@ -2,7 +2,6 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-import type { ITelemetryItem, ITelemetryUnloadState } from '@microsoft/1ds-core-js';
 import assert from 'assert';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 import { OneDataSystemWebAppender } from '../../browser/1dsAppender.js';
@@ -14,11 +13,11 @@ class AppInsightsCoreMock implements IAppInsightsCore {
 	public IsTrackingPageView: boolean = false;
 	public exceptions: any[] = [];
 
-	public track(event: ITelemetryItem) {
+	public track(event: any) {
 		this.events.push(event.baseData);
 	}
 
-	public unload(isAsync: boolean, unloadComplete: (unloadState: ITelemetryUnloadState) => void): void {
+	public unload(isAsync: boolean, unloadComplete: (unloadState: any) => void): void {
 		// No-op
 	}
 }
