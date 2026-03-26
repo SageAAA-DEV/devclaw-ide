@@ -33,6 +33,10 @@
 	"nodejsRepository": "https://nodejs.org",
 	"urlProtocol": "devclaw",
 	"enableTelemetry": false,
+	"cannotImportExtensions": [
+		"github.copilot",
+		"github.copilot-chat"
+	],
 	"defaultChatAgent": {
 		"extensionId": "sageaaa.devclaw-agent",
 		"chatExtensionId": "sageaaa.devclaw-chat",
