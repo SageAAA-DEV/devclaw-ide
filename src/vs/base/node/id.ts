@@ -117,11 +117,27 @@ export async function getSqmMachineId(errorLogger: (error: Error) => void): Prom
 
 export async function getDevDeviceId(errorLogger: (error: Error) => void): Promise<string> {
 	try {
-		const deviceIdPackage = await import('@vscode/deviceid');
-		const id = await deviceIdPackage.getDeviceId();
-		return id;
+		const os = await import('os');
+		const path = await import('path');
+		const fs = await import('fs');
+		const idDir = path.join(os.homedir(), '.devclaw');
+		const idFile = path.join(idDir, 'device-id');
+
+		try {
+			const existing = fs.readFileSync(idFile, 'utf8').trim();
+			if (existing) {
+				return existing;
+			}
+		} catch {
+			// File doesn't exist yet — generate below
+		}
+
+		const newId = uuid.generateUuid();
+		fs.mkdirSync(idDir, { recursive: true });
+		fs.writeFileSync(idFile, newId, 'utf8');
+		return newId;
 	} catch (err) {
-		errorLogger(err);
+		errorLogger(err instanceof Error ? err : new Error(String(err)));
 		return uuid.generateUuid();
 	}
 }
