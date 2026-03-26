@@ -3,7 +3,7 @@
   "version": "1.114.0",
   "distro": "a981e7362565b4058f3bfd7604f8ab8c4f85101b",
   "author": {
-    "name": "Microsoft Corporation"
+    "name": "SageAAA, Inc."
   },
   "license": "MIT",
   "main": "./out/main.js",
@@ -81,8 +81,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sandbox-runtime": "0.0.42",
-    "@github/copilot": "^1.0.4-0",
-    "@github/copilot-sdk": "^0.1.32",
     "@microsoft/1ds-core-js": "^3.2.13",
     "@microsoft/1ds-post-js": "^3.2.13",
     "@parcel/watcher": "^2.5.6",
@@ -241,10 +239,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/microsoft/vscode.git"
+    "url": "https://github.com/sageaaa/devclaw.git"
   },
   "bugs": {
-    "url": "https://github.com/microsoft/vscode/issues"
+    "url": "https://github.com/sageaaa/devclaw/issues"
   },
   "optionalDependencies": {
     "windows-foreground-love": "0.6.1"
