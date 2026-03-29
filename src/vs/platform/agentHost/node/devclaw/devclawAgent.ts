@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) SageAAA, Inc. All rights reserved.
- *  Licensed under the Proprietary License.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { DeferredPromise } from '../../../../base/common/async.js';
@@ -16,25 +16,16 @@ import {
 	IAgentProgressEvent, IAgentSessionMetadata,
 	IAgentToolCompleteEvent, IAgentToolStartEvent,
 } from '../../common/agentService.js';
-import { PermissionKind } from '../../common/state/sessionState.js';
-import { getInvocationMessage, getPastTenseMessage, getShellLanguage, getToolDisplayName, getToolKind, getToolInputString, isHiddenTool } from './devclawToolDisplay.js';
-
-function tryStringify(value: unknown): string | undefined {
-	try {
-		return JSON.stringify(value);
-	} catch {
-		return undefined;
-	}
-}
 
 interface DevClawConfig {
 	baseUrl: string;
-	apiKey: string;
+	appKey: string;
 }
 
 /**
  * Agent provider backed by the CTRL-A backend via REST API.
- * Replaces CopilotAgent as the registered IAgent in the agent host.
+ * Authenticates using the CTRL-A App Registry (`x-app-key` header).
+ * Parses the full CTRL-A response: thinking, toolCalls, sources, tokens.
  */
 export class DevClawAgent extends Disposable implements IAgent {
 	readonly id = 'devclaw' as const;
@@ -73,21 +64,19 @@ export class DevClawAgent extends Disposable implements IAgent {
 	// ---- config --------------------------------------------------------------
 
 	private _getConfig(): DevClawConfig {
-		// Read from environment or .devclaw config
 		const baseUrl = process.env['DEVCLAW_CTRL_A_URL'] || 'http://localhost:3000';
-		const apiKey = process.env['DEVCLAW_CTRL_A_API_KEY'] || '';
-		return { baseUrl, apiKey };
+		const appKey = process.env['DEVCLAW_CTRL_A_APP_KEY'] || '';
+		return { baseUrl, appKey };
 	}
 
 	private _isConfigured(): boolean {
 		const config = this._getConfig();
-		return !!config.baseUrl && config.baseUrl !== 'http://localhost:3000';
+		return !!config.baseUrl;
 	}
 
 	// ---- session management --------------------------------------------------
 
 	async listSessions(): Promise<IAgentSessionMetadata[]> {
-		// In-memory sessions only for now — no persistence
 		const result: IAgentSessionMetadata[] = [];
 		for (const [id, session] of this._sessions) {
 			result.push({
@@ -134,10 +123,9 @@ export class DevClawAgent extends Disposable implements IAgent {
 		if (!this._isConfigured()) {
 			this._onDidSessionProgress.fire({
 				session: sessionUri,
-				type: 'message',
-				role: 'assistant',
+				type: 'delta',
 				messageId: generateUuid(),
-				content: 'CTRL-A is not connected. Set the `DEVCLAW_CTRL_A_URL` and `DEVCLAW_CTRL_A_API_KEY` environment variables, or configure your connection in DevClaw Settings.',
+				content: 'CTRL-A is not connected. Set `DEVCLAW_CTRL_A_URL` and `DEVCLAW_CTRL_A_APP_KEY` environment variables, or configure your connection in DevClaw Settings.',
 			});
 			this._onDidSessionProgress.fire({ session: sessionUri, type: 'idle' });
 			return;
@@ -163,18 +151,26 @@ export class DevClawAgent extends Disposable implements IAgent {
 			const url = new URL(`${config.baseUrl}/api/chat`);
 			const transport = url.protocol === 'https:' ? https : http;
 
-			const body = JSON.stringify({
+			const payload: Record<string, string> = {
 				message: fullMessage,
 				agentId: session.agentId,
-			});
+			};
+			if (session.conversationId) {
+				payload.conversationId = session.conversationId;
+			}
+			const body = JSON.stringify(payload);
+
+			const headers: Record<string, string> = {
+				'Content-Type': 'application/json',
+			};
+			if (config.appKey) {
+				headers['x-app-key'] = config.appKey;
+			}
 
 			const response = await new Promise<string>((resolve, reject) => {
 				const req = transport.request(url, {
 					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'x-api-key': config.apiKey,
-					},
+					headers,
 				}, (res) => {
 					let data = '';
 					res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
@@ -182,7 +178,8 @@ export class DevClawAgent extends Disposable implements IAgent {
 						if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
 							resolve(data);
 						} else {
-							reject(new Error(`CTRL-A API error: ${res.statusCode} ${res.statusMessage}`));
+							// Include response body for better error diagnostics
+							reject(new Error(`CTRL-A API ${res.statusCode}: ${data || res.statusMessage}`));
 						}
 					});
 				});
@@ -192,23 +189,99 @@ export class DevClawAgent extends Disposable implements IAgent {
 			});
 
 			const data = JSON.parse(response);
-			const content = data.response || data.message || 'No response from agent.';
 
+			// Persist conversationId for multi-turn conversations
+			if (data.conversationId) {
+				session.conversationId = data.conversationId;
+			}
+
+			// Emit thinking/reasoning if present
+			if (data.thinking) {
+				this._onDidSessionProgress.fire({
+					session: sessionUri,
+					type: 'reasoning',
+					content: data.thinking,
+				});
+			}
+
+			// Emit tool calls as tool_start + tool_complete events
+			if (data.toolCalls && Array.isArray(data.toolCalls)) {
+				for (const tc of data.toolCalls) {
+					const toolCallId = generateUuid();
+					this._onDidSessionProgress.fire({
+						session: sessionUri,
+						type: 'tool_start',
+						toolCallId,
+						toolName: tc.tool,
+						displayName: tc.tool,
+						invocationMessage: `Running \`${tc.tool}\``,
+						toolInput: typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input),
+					});
+					this._onDidSessionProgress.fire({
+						session: sessionUri,
+						type: 'tool_complete',
+						toolCallId,
+						success: true,
+						pastTenseMessage: `Ran \`${tc.tool}\``,
+						toolOutput: typeof tc.result === 'string' ? tc.result.substring(0, 2000) : JSON.stringify(tc.result).substring(0, 2000),
+					});
+				}
+			}
+
+			// Emit the main response content
+			const content = data.response || data.message || 'No response from agent.';
 			this._onDidSessionProgress.fire({
 				session: sessionUri,
-				type: 'message',
-				role: 'assistant',
+				type: 'delta',
 				messageId: generateUuid(),
 				content,
 			});
+
+			// Emit token usage if available
+			if (data.inputTokens || data.outputTokens) {
+				this._onDidSessionProgress.fire({
+					session: sessionUri,
+					type: 'usage',
+					inputTokens: data.inputTokens,
+					outputTokens: data.outputTokens,
+					model: data.model,
+				});
+			}
+
+			this._logService.info(`[DevClaw:${sessionId}] Response from ${data.agentName || data.agentId} (${data.model}), ${data.toolCalls?.length || 0} tool calls`);
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
 			this._logService.error(`[DevClaw:${sessionId}] Error: ${errorMsg}`);
+
+			// Parse structured error from CTRL-A if available
+			let displayMsg: string;
+			if (errorMsg.includes('ECONNREFUSED')) {
+				displayMsg = `Cannot reach CTRL-A at ${config.baseUrl}. Make sure CTRL-A is running.`;
+			} else if (errorMsg.includes('CTRL-A API')) {
+				// Try to extract the JSON error body
+				try {
+					const jsonStart = errorMsg.indexOf('{');
+					if (jsonStart >= 0) {
+						const parsed = JSON.parse(errorMsg.substring(jsonStart));
+						displayMsg = parsed.error || parsed.message || errorMsg;
+						if (parsed.details) {
+							displayMsg += ': ' + parsed.details.map((d: { field: string; message: string }) => `${d.field} — ${d.message}`).join(', ');
+						}
+					} else {
+						displayMsg = errorMsg;
+					}
+				} catch {
+					displayMsg = errorMsg;
+				}
+			} else {
+				displayMsg = errorMsg;
+			}
+
 			this._onDidSessionProgress.fire({
 				session: sessionUri,
 				type: 'error',
 				errorType: 'connection',
-				message: `Connection error: ${errorMsg}. Check your CTRL-A connection.`,
+				message: displayMsg,
 			});
 		}
 
@@ -280,10 +353,12 @@ export class DevClawAgent extends Disposable implements IAgent {
 	}
 }
 
-/** Lightweight session state. */
+/** Session state — tracks conversationId for multi-turn persistence. */
 class DevClawSession {
 	readonly startTime = Date.now();
 	lastMessage = '';
+	/** CTRL-A conversationId, set after first response. */
+	conversationId: string | undefined;
 
 	constructor(
 		readonly sessionId: string,

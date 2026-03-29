@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) SageAAA, Inc. All rights reserved.
- *  Licensed under the Proprietary License.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 // Settings import commands: VS Code, Cursor, Windsurf, Antigravity → DevClaw
@@ -9,9 +9,9 @@ import { localize } from '../../../../nls.js';
 import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
-import { IEnvironmentService } from '../../../../platform/environment/common/environment.js';
+import { IEnvironmentService, INativeEnvironmentService } from '../../../../platform/environment/common/environment.js';
 import { URI } from '../../../../base/common/uri.js';
-import { isWindows, isMacintosh } from '../../../../base/common/platform.js';
+import { isWindows } from '../../../../base/common/platform.js';
 
 interface IDESource {
 	name: string;
@@ -56,10 +56,10 @@ function getIDESources(): Record<string, IDESource> {
 
 /**
  * Resolves the appData base URI from the environment.
- * IEnvironmentService.appSettingsHome already points to our own User dir,
+ * INativeEnvironmentService.appSettingsHome already points to our own User dir,
  * so we go up two levels to reach the appData root (e.g., %APPDATA% on Windows).
  */
-function getAppDataRoot(environmentService: IEnvironmentService): URI {
+function getAppDataRoot(environmentService: INativeEnvironmentService): URI {
 	// appSettingsHome = <appData>/<productName>/User
 	// We need <appData>
 	return URI.joinPath(environmentService.appSettingsHome, '..', '..');
@@ -69,7 +69,7 @@ async function importSettings(
 	sourceKey: string,
 	fileService: IFileService,
 	notificationService: INotificationService,
-	environmentService: IEnvironmentService,
+	environmentService: INativeEnvironmentService,
 ): Promise<void> {
 	const sources = getIDESources();
 	const source = sources[sourceKey];
@@ -142,7 +142,7 @@ for (const [key, source] of Object.entries(getIDESources())) {
 	CommandsRegistry.registerCommand(commandId, async (accessor) => {
 		const fileService = accessor.get(IFileService);
 		const notificationService = accessor.get(INotificationService);
-		const environmentService = accessor.get(IEnvironmentService);
+		const environmentService = accessor.get(IEnvironmentService) as INativeEnvironmentService;
 		await importSettings(key, fileService, notificationService, environmentService);
 	});
 }

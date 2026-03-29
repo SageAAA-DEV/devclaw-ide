@@ -1,7 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  DevClaw - Native Chat Agent Registration
- *  Registers CTRL-A agents as VS Code chat participants.
- *  @devin, @scout, @sage, @ink, @ctrl-a — native in the chat.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { Disposable } from '../../../../base/common/lifecycle.js';
@@ -17,7 +16,8 @@ import { IEditorService } from '../../../services/editor/common/editorService.js
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { URI } from '../../../../base/common/uri.js';
 import { VSBuffer } from '../../../../base/common/buffer.js';
-import { CtrlAClient } from '../common/ctrlAClient.js';
+// CtrlAClient available for WebSocket streaming in future
+// import { CtrlAClient } from '../common/ctrlAClient.js';
 
 interface DevClawAgentDef {
 	id: string;
@@ -136,7 +136,7 @@ export class DevClawAgentRegistration extends Disposable {
 				description: cmd.description,
 			})),
 			metadata: {
-				isSticky: false,
+				isSticky: true,
 			},
 			disambiguation: [],
 		};
@@ -163,57 +163,163 @@ export class DevClawAgentRegistration extends Disposable {
 	 * - Currently open file content
 	 * - Reads any file paths mentioned in the message
 	 */
+	/**
+	 * Recursively builds a directory tree string, skipping common noise directories.
+	 * Returns lines like: "  +-- src/", "  |   +-- app/", "  |   |   +-- page.tsx"
+	 */
+	private async buildDirectoryTree(folderUri: URI, prefix: string, depth: number, maxDepth: number): Promise<string[]> {
+		if (depth > maxDepth) {
+			return [];
+		}
+
+		const skipDirs = new Set([
+			'node_modules', '.git', '.next', '.turbo', 'dist', 'build', 'out',
+			'.cache', '.vercel', '.output', '__pycache__', '.svelte-kit',
+			'coverage', '.nyc_output', '.parcel-cache', 'vendor',
+		]);
+
+		try {
+			const entries = await this.fileService.resolve(folderUri, { resolveMetadata: false });
+			if (!entries.children) {
+				return [];
+			}
+
+			const sorted = [...entries.children].sort((a, b) => {
+				// Directories first, then files
+				if (a.isDirectory && !b.isDirectory) { return -1; }
+				if (!a.isDirectory && b.isDirectory) { return 1; }
+				return a.name.localeCompare(b.name);
+			});
+
+			const lines: string[] = [];
+			for (let i = 0; i < sorted.length; i++) {
+				const entry = sorted[i];
+				const isLast = i === sorted.length - 1;
+				// allow-any-unicode-next-line
+				const connector = isLast ? '\u2514\u2500\u2500 ' : '\u251C\u2500\u2500 ';
+				// allow-any-unicode-next-line
+				const childPrefix = isLast ? '    ' : '\u2502   ';
+
+				if (entry.isDirectory) {
+					if (skipDirs.has(entry.name)) {
+						continue;
+					}
+					lines.push(`${prefix}${connector}${entry.name}/`);
+					const children = await this.buildDirectoryTree(entry.resource, prefix + childPrefix, depth + 1, maxDepth);
+					lines.push(...children);
+				} else {
+					lines.push(`${prefix}${connector}${entry.name}`);
+				}
+			}
+			return lines;
+		} catch {
+			return [];
+		}
+	}
+
 	private async gatherLocalContext(message: string): Promise<string> {
 		const contextParts: string[] = [];
 
-		// 1. Workspace info
 		const folders = this.workspaceService.getWorkspace().folders;
 		if (folders.length > 0) {
 			const folder = folders[0];
-			const folderName = folder.name;
-			contextParts.push(`[Workspace: ${folderName} at ${folder.uri.fsPath}]`);
+			contextParts.push(`[Workspace: ${folder.name} at ${folder.uri.fsPath}]`);
 
-			// Try to read key project files for context
-			for (const keyFile of ['package.json', 'README.md', 'CLAUDE.md']) {
+			// 1. Directory tree (3 levels deep — gives real project structure)
+			try {
+				const treeLines = await this.buildDirectoryTree(folder.uri, '', 0, 3);
+				if (treeLines.length > 0) {
+					contextParts.push(`[Project Structure]\n${treeLines.join('\n')}`);
+				}
+			} catch {
+				// Skip tree on error
+			}
+
+			// 2. Key project files — full content for important ones, truncated for large ones
+			const keyFiles: { path: string; maxChars: number }[] = [
+				{ path: 'package.json', maxChars: 3000 },
+				{ path: 'CLAUDE.md', maxChars: 5000 },
+				{ path: 'README.md', maxChars: 2000 },
+				{ path: 'tsconfig.json', maxChars: 1000 },
+				{ path: 'next.config.js', maxChars: 1000 },
+				{ path: 'next.config.mjs', maxChars: 1000 },
+				{ path: 'next.config.ts', maxChars: 1000 },
+				{ path: '.env.example', maxChars: 500 },
+				{ path: 'tailwind.config.ts', maxChars: 1500 },
+				{ path: 'tailwind.config.js', maxChars: 1500 },
+				{ path: 'prisma/schema.prisma', maxChars: 3000 },
+				{ path: 'drizzle.config.ts', maxChars: 1000 },
+			];
+
+			for (const { path, maxChars } of keyFiles) {
 				try {
-					const fileUri = URI.joinPath(folder.uri, keyFile);
-					const exists = await this.fileService.exists(fileUri);
-					if (exists) {
+					const fileUri = URI.joinPath(folder.uri, path);
+					if (await this.fileService.exists(fileUri)) {
 						const content = await this.fileService.readFile(fileUri);
 						const text = content.value.toString();
-						// Limit to first 500 chars for context
-						contextParts.push(`[File: ${keyFile}]\n${text.substring(0, 500)}${text.length > 500 ? '\n...(truncated)' : ''}`);
+						const truncated = text.length > maxChars;
+						contextParts.push(`[File: ${path}]\n${text.substring(0, maxChars)}${truncated ? '\n...(truncated)' : ''}`);
 					}
 				} catch {
 					// Skip files we can't read
 				}
 			}
-		}
 
-		// 2. Currently open/active file
-		const activeEditor = this.editorService.activeTextEditorControl;
-		const activeResource = this.editorService.activeEditor?.resource;
-		if (activeEditor && activeResource) {
-			const model = activeEditor.getModel?.();
-			if (model && 'getValue' in model) {
-				const content = (model as { getValue(): string }).getValue();
-				const fileName = activeResource.path.split('/').pop() || 'unknown';
-				// Limit to 2000 chars
-				contextParts.push(`[Active file: ${fileName} (${activeResource.fsPath})]\n${content.substring(0, 2000)}${content.length > 2000 ? '\n...(truncated)' : ''}`);
+			// 3. Scan for key entry points (app router or pages router)
+			const entryPoints = [
+				'src/app/layout.tsx', 'src/app/page.tsx', 'app/layout.tsx', 'app/page.tsx',
+				'src/pages/_app.tsx', 'src/pages/index.tsx', 'pages/_app.tsx', 'pages/index.tsx',
+				'src/index.ts', 'src/index.tsx', 'src/main.ts', 'src/main.tsx',
+			];
+			for (const ep of entryPoints) {
+				try {
+					const fileUri = URI.joinPath(folder.uri, ep);
+					if (await this.fileService.exists(fileUri)) {
+						const content = await this.fileService.readFile(fileUri);
+						const text = content.value.toString();
+						contextParts.push(`[Entry: ${ep}]\n${text.substring(0, 3000)}${text.length > 3000 ? '\n...(truncated)' : ''}`);
+					}
+				} catch {
+					// Skip
+				}
 			}
 		}
 
-		// 3. Detect file paths in the message and read them
+		// 4. All open editor tabs — not just the active one
+		const openEditors = this.editorService.editors;
+		const seenPaths = new Set<string>();
+		for (const editor of openEditors) {
+			const resource = editor.resource;
+			if (!resource || seenPaths.has(resource.fsPath)) {
+				continue;
+			}
+			seenPaths.add(resource.fsPath);
+			try {
+				const content = await this.fileService.readFile(resource);
+				const text = content.value.toString();
+				const fileName = resource.path.split('/').pop() || 'unknown';
+				const isActive = resource.toString() === this.editorService.activeEditor?.resource?.toString();
+				const label = isActive ? `Active file: ${fileName}` : `Open tab: ${fileName}`;
+				contextParts.push(`[${label} (${resource.fsPath})]\n${text.substring(0, 4000)}${text.length > 4000 ? '\n...(truncated)' : ''}`);
+			} catch {
+				// Skip files we can't read
+			}
+		}
+
+		// 5. Detect file paths mentioned in the message and read them
 		const pathPatterns = [
-			/([A-Za-z]:\\[^\s"']+)/g,           // Windows paths: C:\Users\...
-			/(\/[^\s"']+\.[a-zA-Z]{1,10})/g,     // Unix paths: /home/user/file.ts
-			/(?:^|\s)([\w.-]+\.(?:ts|js|json|md|py|html|css|tsx|jsx|yaml|yml|toml))/g,  // Relative filenames
+			/([A-Za-z]:\\[^\s"']+)/g,
+			/(\/[^\s"']+\.[a-zA-Z]{1,10})/g,
+			/(?:^|\s)([\w./\\-]+\.(?:ts|js|json|md|py|html|css|tsx|jsx|yaml|yml|toml))/g,
 		];
 
 		for (const pattern of pathPatterns) {
 			const matches = message.matchAll(pattern);
 			for (const match of matches) {
 				const filePath = match[1];
+				if (seenPaths.has(filePath)) {
+					continue;
+				}
 				try {
 					let fileUri: URI;
 					if (filePath.match(/^[A-Za-z]:\\/)) {
@@ -226,19 +332,23 @@ export class DevClawAgentRegistration extends Disposable {
 						continue;
 					}
 
-					const exists = await this.fileService.exists(fileUri);
-					if (exists) {
+					if (await this.fileService.exists(fileUri)) {
 						const content = await this.fileService.readFile(fileUri);
 						const text = content.value.toString();
-						contextParts.push(`[Referenced file: ${filePath}]\n${text.substring(0, 3000)}${text.length > 3000 ? '\n...(truncated)' : ''}`);
+						contextParts.push(`[Referenced: ${filePath}]\n${text.substring(0, 3000)}${text.length > 3000 ? '\n...(truncated)' : ''}`);
 					}
 				} catch {
-					// Skip files we can't read
+					// Skip
 				}
 			}
 		}
 
-		return contextParts.length > 0 ? '\n\n---\n[LOCAL CONTEXT FROM DEVCLAW IDE]\n' + contextParts.join('\n\n') : '';
+		const fullContext = contextParts.length > 0 ? '\n\n---\n[LOCAL CONTEXT FROM DEVCLAW IDE]\n' + contextParts.join('\n\n') : '';
+		// Cap total context to 80k chars to stay within backend limits
+		if (fullContext.length > 80000) {
+			return fullContext.substring(0, 80000) + '\n...(context truncated)';
+		}
+		return fullContext;
 	}
 
 	private async handleRequest(
@@ -275,8 +385,9 @@ export class DevClawAgentRegistration extends Disposable {
 			// Gather local workspace context (files, active editor, referenced paths)
 			const localContext = await this.gatherLocalContext(message);
 
-			// All DevClaw agents route through ctrl-a on the backend
-			const ctrlAAgentId = 'ctrl-a';
+			// All agents route through ctrl-a on the backend (it's the router)
+			// The persona/role context tells ctrl-a which specialist voice to use
+			const agentId = 'ctrl-a';
 			const roleContext = persona ? `[Respond as ${def.fullName}: ${persona}]\n\n` : '';
 			const capabilities = `[DEVCLAW IDE CAPABILITIES: You ARE running inside DevClaw IDE. You CAN create and edit files. When the user asks you to create or modify a file, respond with the full file content in a markdown code block with the filename as the language tag, like:\n\`\`\`path/to/file.ts\nfile content here\n\`\`\`\nThe user can click Apply to write it to disk. You CAN see the workspace files. You have full local context. Act like you have filesystem access — because DevClaw handles it for you.]\n\n`;
 			const fullMessage = roleContext + capabilities + message + localContext;
@@ -286,42 +397,65 @@ export class DevClawAgentRegistration extends Disposable {
 
 			// Try streaming endpoint first, fall back to blocking fetch
 			let streamedResponse = '';
-			const client = new CtrlAClient({ baseUrl: url, apiKey: apiKey });
 
-			try {
-				streamedResponse = await client.chatStream(ctrlAAgentId, fullMessage, (chunk) => {
-					progress([{
-						kind: 'markdownContent',
-						content: new MarkdownString(chunk),
-					}]);
-				});
-			} catch {
-				// Fall back to blocking fetch if streaming endpoint not available
-				const res = await fetch(`${url}/api/chat`, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'x-api-key': apiKey,
-					},
-					body: JSON.stringify({ message: fullMessage, agentId: ctrlAAgentId }),
-					signal: controller.signal,
-				});
+			// Use REST chat endpoint (no streaming endpoint exists on CTRL-A)
+			const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+			if (apiKey) {
+				headers['x-app-key'] = apiKey;
+			}
 
-				if (!res.ok) {
-					progress([{
-						kind: 'markdownContent',
-						content: new MarkdownString(`**Error:** CTRL-A returned ${res.status} ${res.statusText}`),
-					}]);
-					return { metadata: {} };
-				}
+			const res = await fetch(`${url}/api/chat`, {
+				method: 'POST',
+				headers,
+				body: JSON.stringify({ message: fullMessage, agentId }),
+				signal: controller.signal,
+			});
 
-				const data = await res.json();
-				streamedResponse = data.response || data.message || 'No response from agent.';
+			if (!res.ok) {
+				let errorDetail = `${res.status} ${res.statusText}`;
+				try {
+					const errBody = await res.json();
+					errorDetail = errBody.error || errorDetail;
+					if (errBody.details) {
+						errorDetail += ': ' + errBody.details.map((d: { field: string; message: string }) => `${d.field} — ${d.message}`).join(', ');
+					}
+				} catch { /* use status text */ }
 				progress([{
 					kind: 'markdownContent',
-					content: new MarkdownString(streamedResponse),
+					content: new MarkdownString(`**CTRL-A Error:** ${errorDetail}`),
 				}]);
+				return { metadata: {} };
 			}
+
+			const data = await res.json();
+
+			// Show thinking as a collapsed block if present
+			if (data.thinking) {
+				const thinkingMd = new MarkdownString();
+				thinkingMd.supportHtml = true;
+				// allow-any-unicode-next-line
+				thinkingMd.value = `<details><summary>\u{1F4AD} Thinking...</summary>\n\n${data.thinking}\n\n</details>\n\n`;
+				progress([{ kind: 'markdownContent', content: thinkingMd }]);
+			}
+
+			// Show tool calls as a collapsed block if present
+			if (data.toolCalls && data.toolCalls.length > 0) {
+				const toolLines = data.toolCalls.map((tc: { tool: string; result: string }) =>
+					`- **${tc.tool}**: ${typeof tc.result === 'string' ? tc.result.substring(0, 200) : JSON.stringify(tc.result).substring(0, 200)}`
+				).join('\n');
+				const toolMd = new MarkdownString();
+				toolMd.supportHtml = true;
+				// allow-any-unicode-next-line
+				toolMd.value = `<details><summary>\u{1F527} ${data.toolCalls.length} tool(s) used</summary>\n\n${toolLines}\n\n</details>\n\n`;
+				progress([{ kind: 'markdownContent', content: toolMd }]);
+			}
+
+			// Show the main response
+			streamedResponse = data.response || data.message || 'No response from agent.';
+			progress([{
+				kind: 'markdownContent',
+				content: new MarkdownString(streamedResponse),
+			}]);
 
 			// Auto-detect code blocks with file paths and create/update files
 			const createdFiles = await this.autoApplyCodeBlocks(streamedResponse);
