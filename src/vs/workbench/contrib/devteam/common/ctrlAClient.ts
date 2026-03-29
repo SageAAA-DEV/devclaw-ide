@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  DevTeam IDE - CTRL-A Client
- *  Handles all communication with the CTRL-A backend via REST API + WebSocket.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 export interface CtrlAConfig {
@@ -53,7 +53,7 @@ export class CtrlAClient {
 	private readonly allListeners: Set<StreamListener> = new Set();
 	private connected = false;
 
-	constructor(private config: CtrlAConfig) {}
+	constructor(private config: CtrlAConfig) { }
 
 	// --- Configuration ---
 
@@ -165,7 +165,12 @@ export class CtrlAClient {
 	}
 
 	private headers(): Record<string, string> {
-		return { 'x-api-key': this.config.apiKey };
+		const h: Record<string, string> = {};
+		if (this.config.apiKey) {
+			// Use x-app-key for CTRL-A App Registry authentication
+			h['x-app-key'] = this.config.apiKey;
+		}
+		return h;
 	}
 
 	// --- WebSocket ---
