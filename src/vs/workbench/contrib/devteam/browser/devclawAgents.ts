@@ -18,6 +18,7 @@ import { URI } from '../../../../base/common/uri.js';
 import { VSBuffer } from '../../../../base/common/buffer.js';
 // CtrlAClient available for WebSocket streaming in future
 // import { CtrlAClient } from '../common/ctrlAClient.js';
+import { IDevClawService } from './devclawService.js';
 
 interface DevClawAgentDef {
 	id: string;
@@ -105,6 +106,7 @@ export class DevClawAgentRegistration extends Disposable {
 		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
 		@IEditorService private readonly editorService: IEditorService,
 		@IFileService private readonly fileService: IFileService,
+		@IDevClawService private readonly devClawService: IDevClawService,
 	) {
 		super();
 		this.registerAllAgents();
@@ -357,21 +359,20 @@ export class DevClawAgentRegistration extends Disposable {
 		progress: (parts: IChatProgress[]) => void,
 		token: CancellationToken,
 	): Promise<IChatAgentResult> {
-		const url = this.storageService.get('devteam.ctrlA.url', StorageScope.APPLICATION, '');
-		const apiKey = this.storageService.get('devteam.ctrlA.apiKey', StorageScope.APPLICATION, '');
 		const message = request.message || '';
-
 		const persona = AGENT_PERSONAS[def.name] || '';
 
-		if (!url) {
+		const backend = this.devClawService.backendType;
+
+		if (!this.devClawService.isConnected) {
+			const backendName = backend === 'openclaw' ? 'OpenClaw' : 'CTRL-A';
 			progress([{
 				kind: 'markdownContent',
 				content: new MarkdownString(
 					`**${def.fullName}** is ready.\n\n` +
 					`> ${persona}\n\n` +
 					`---\n\n` +
-					`CTRL-A is not connected. Configure your connection in **DevClaw Settings** (gear icon in the sidebar) to unlock full agent capabilities.\n\n` +
-					`Set your CTRL-A Server URL and API Key, then click **Test Connection**.`
+					`${backendName} is not connected. Configure your connection in **DevClaw Settings** (gear icon in the sidebar).`
 				),
 			}]);
 			return { metadata: {} };
@@ -395,39 +396,51 @@ export class DevClawAgentRegistration extends Disposable {
 			const controller = new AbortController();
 			token.onCancellationRequested(() => controller.abort());
 
-			// Try streaming endpoint first, fall back to blocking fetch
 			let streamedResponse = '';
 
-			// Use REST chat endpoint (no streaming endpoint exists on CTRL-A)
-			const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-			if (apiKey) {
-				headers['x-app-key'] = apiKey;
+			let data: { response?: string; message?: string; thinking?: string; toolCalls?: { tool: string; result: string }[] };
+
+			if (backend === 'openclaw') {
+				// OpenClaw path — route through the shared backend client
+				const client = this.devClawService.getClient();
+				const response = await client.chat(agentId, fullMessage);
+				streamedResponse = response.response;
+				data = { response: streamedResponse };
+			} else {
+				// CTRL-A path — direct REST fetch to /api/chat
+				const url = this.storageService.get('devteam.ctrlA.url', StorageScope.APPLICATION, '');
+				const apiKey = this.storageService.get('devteam.ctrlA.apiKey', StorageScope.APPLICATION, '');
+
+				const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+				if (apiKey) {
+					headers['x-app-key'] = apiKey;
+				}
+
+				const res = await fetch(`${url}/api/chat`, {
+					method: 'POST',
+					headers,
+					body: JSON.stringify({ message: fullMessage, agentId }),
+					signal: controller.signal,
+				});
+
+				if (!res.ok) {
+					let errorDetail = `${res.status} ${res.statusText}`;
+					try {
+						const errBody = await res.json();
+						errorDetail = errBody.error || errorDetail;
+						if (errBody.details) {
+							errorDetail += ': ' + errBody.details.map((d: { field: string; message: string }) => `${d.field} — ${d.message}`).join(', ');
+						}
+					} catch { /* use status text */ }
+					progress([{
+						kind: 'markdownContent',
+						content: new MarkdownString(`**CTRL-A Error:** ${errorDetail}`),
+					}]);
+					return { metadata: {} };
+				}
+
+				data = await res.json();
 			}
-
-			const res = await fetch(`${url}/api/chat`, {
-				method: 'POST',
-				headers,
-				body: JSON.stringify({ message: fullMessage, agentId }),
-				signal: controller.signal,
-			});
-
-			if (!res.ok) {
-				let errorDetail = `${res.status} ${res.statusText}`;
-				try {
-					const errBody = await res.json();
-					errorDetail = errBody.error || errorDetail;
-					if (errBody.details) {
-						errorDetail += ': ' + errBody.details.map((d: { field: string; message: string }) => `${d.field} — ${d.message}`).join(', ');
-					}
-				} catch { /* use status text */ }
-				progress([{
-					kind: 'markdownContent',
-					content: new MarkdownString(`**CTRL-A Error:** ${errorDetail}`),
-				}]);
-				return { metadata: {} };
-			}
-
-			const data = await res.json();
 
 			// Show thinking as a collapsed block if present
 			if (data.thinking) {
