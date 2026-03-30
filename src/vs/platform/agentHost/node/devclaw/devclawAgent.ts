@@ -18,14 +18,20 @@ import {
 } from '../../common/agentService.js';
 
 interface DevClawConfig {
+	backend: 'openclaw' | 'ctrl-a';
+	// OpenClaw
+	openclawUrl: string;
+	openclawToken: string;
+	// CTRL-A
 	baseUrl: string;
 	appKey: string;
 }
 
 /**
- * Agent provider backed by the CTRL-A backend via REST API.
- * Authenticates using the CTRL-A App Registry (`x-app-key` header).
- * Parses the full CTRL-A response: thinking, toolCalls, sources, tokens.
+ * Agent provider backed by OpenClaw (embedded, default) or CTRL-A (cloud) via REST API.
+ * Backend is selected via DEVCLAW_BACKEND env var ('openclaw' | 'ctrl-a').
+ * OpenClaw: POST /v1/chat/completions (OpenAI-compatible), Bearer token auth.
+ * CTRL-A: POST /api/chat, x-app-key auth, full response with thinking/toolCalls/sources/tokens.
  */
 export class DevClawAgent extends Disposable implements IAgent {
 	readonly id = 'devclaw' as const;
@@ -48,7 +54,7 @@ export class DevClawAgent extends Disposable implements IAgent {
 		return {
 			provider: 'devclaw',
 			displayName: 'Agent Host - DevClaw',
-			description: 'CTRL-A agent team running via REST API',
+			description: 'AI agent team via OpenClaw (embedded) or CTRL-A (cloud)',
 			requiresAuth: false,
 		};
 	}
@@ -64,13 +70,19 @@ export class DevClawAgent extends Disposable implements IAgent {
 	// ---- config --------------------------------------------------------------
 
 	private _getConfig(): DevClawConfig {
-		const baseUrl = process.env['DEVCLAW_CTRL_A_URL'] || 'http://localhost:3000';
-		const appKey = process.env['DEVCLAW_CTRL_A_APP_KEY'] || '';
-		return { baseUrl, appKey };
+		const backend = (process.env['DEVCLAW_BACKEND'] || 'openclaw') as 'openclaw' | 'ctrl-a';
+		return {
+			backend,
+			openclawUrl: `http://127.0.0.1:${process.env['DEVCLAW_OPENCLAW_PORT'] || '18789'}`,
+			openclawToken: process.env['DEVCLAW_OPENCLAW_TOKEN'] || '',
+			baseUrl: process.env['DEVCLAW_CTRL_A_URL'] || 'http://localhost:3000',
+			appKey: process.env['DEVCLAW_CTRL_A_APP_KEY'] || '',
+		};
 	}
 
 	private _isConfigured(): boolean {
 		const config = this._getConfig();
+		if (config.backend === 'openclaw') { return true; }
 		return !!config.baseUrl;
 	}
 
@@ -121,11 +133,15 @@ export class DevClawAgent extends Disposable implements IAgent {
 
 		const config = this._getConfig();
 		if (!this._isConfigured()) {
+			const backendName = config.backend === 'openclaw' ? 'OpenClaw' : 'CTRL-A';
+			const hint = config.backend === 'openclaw'
+				? 'Set `DEVCLAW_OPENCLAW_PORT` and `DEVCLAW_OPENCLAW_TOKEN` environment variables, or configure your connection in DevClaw Settings.'
+				: 'Set `DEVCLAW_CTRL_A_URL` and `DEVCLAW_CTRL_A_APP_KEY` environment variables, or configure your connection in DevClaw Settings.';
 			this._onDidSessionProgress.fire({
 				session: sessionUri,
 				type: 'delta',
 				messageId: generateUuid(),
-				content: 'CTRL-A is not connected. Set `DEVCLAW_CTRL_A_URL` and `DEVCLAW_CTRL_A_APP_KEY` environment variables, or configure your connection in DevClaw Settings.',
+				content: `${backendName} is not connected. ${hint}`,
 			});
 			this._onDidSessionProgress.fire({ session: sessionUri, type: 'idle' });
 			return;
@@ -148,116 +164,165 @@ export class DevClawAgent extends Disposable implements IAgent {
 		try {
 			const { default: http } = await import('http');
 			const { default: https } = await import('https');
-			const url = new URL(`${config.baseUrl}/api/chat`);
-			const transport = url.protocol === 'https:' ? https : http;
 
-			const payload: Record<string, string> = {
-				message: fullMessage,
-				agentId: session.agentId,
-			};
-			if (session.conversationId) {
-				payload.conversationId = session.conversationId;
-			}
-			const body = JSON.stringify(payload);
+			if (config.backend === 'openclaw') {
+				// --- OpenClaw path (OpenAI-compatible /v1/chat/completions) ---
+				const url = new URL(`${config.openclawUrl}/v1/chat/completions`);
+				const transport = url.protocol === 'https:' ? https : http;
 
-			const headers: Record<string, string> = {
-				'Content-Type': 'application/json',
-			};
-			if (config.appKey) {
-				headers['x-app-key'] = config.appKey;
-			}
-
-			const response = await new Promise<string>((resolve, reject) => {
-				const req = transport.request(url, {
-					method: 'POST',
-					headers,
-				}, (res) => {
-					let data = '';
-					res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
-					res.on('end', () => {
-						if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-							resolve(data);
-						} else {
-							// Include response body for better error diagnostics
-							reject(new Error(`CTRL-A API ${res.statusCode}: ${data || res.statusMessage}`));
-						}
-					});
+				const body = JSON.stringify({
+					model: `openclaw:${session.agentId}`,
+					messages: [{ role: 'user', content: fullMessage }],
+					user: session.sessionId,
 				});
-				req.on('error', reject);
-				req.write(body);
-				req.end();
-			});
 
-			const data = JSON.parse(response);
+				const headers: Record<string, string> = {
+					'Content-Type': 'application/json',
+				};
+				if (config.openclawToken) {
+					headers['Authorization'] = `Bearer ${config.openclawToken}`;
+				}
 
-			// Persist conversationId for multi-turn conversations
-			if (data.conversationId) {
-				session.conversationId = data.conversationId;
-			}
+				const response = await new Promise<string>((resolve, reject) => {
+					const req = transport.request(url, { method: 'POST', headers }, (res) => {
+						let data = '';
+						res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+						res.on('end', () => {
+							if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+								resolve(data);
+							} else {
+								reject(new Error(`OpenClaw API ${res.statusCode}: ${data || res.statusMessage}`));
+							}
+						});
+					});
+					req.on('error', reject);
+					req.write(body);
+					req.end();
+				});
 
-			// Emit thinking/reasoning if present
-			if (data.thinking) {
+				const data = JSON.parse(response);
+				const content = data.choices?.[0]?.message?.content || 'No response from OpenClaw.';
+
 				this._onDidSessionProgress.fire({
 					session: sessionUri,
-					type: 'reasoning',
-					content: data.thinking,
+					type: 'delta',
+					messageId: generateUuid(),
+					content,
 				});
-			}
 
-			// Emit tool calls as tool_start + tool_complete events
-			if (data.toolCalls && Array.isArray(data.toolCalls)) {
-				for (const tc of data.toolCalls) {
-					const toolCallId = generateUuid();
-					this._onDidSessionProgress.fire({
-						session: sessionUri,
-						type: 'tool_start',
-						toolCallId,
-						toolName: tc.tool,
-						displayName: tc.tool,
-						invocationMessage: `Running \`${tc.tool}\``,
-						toolInput: typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input),
+				this._logService.info(`[DevClaw:${sessionId}] OpenClaw response via model openclaw:${session.agentId}`);
+			} else {
+				// --- CTRL-A path (POST /api/chat) ---
+				const url = new URL(`${config.baseUrl}/api/chat`);
+				const transport = url.protocol === 'https:' ? https : http;
+
+				const payload: Record<string, string> = {
+					message: fullMessage,
+					agentId: session.agentId,
+				};
+				if (session.conversationId) {
+					payload.conversationId = session.conversationId;
+				}
+				const body = JSON.stringify(payload);
+
+				const headers: Record<string, string> = {
+					'Content-Type': 'application/json',
+				};
+				if (config.appKey) {
+					headers['x-app-key'] = config.appKey;
+				}
+
+				const response = await new Promise<string>((resolve, reject) => {
+					const req = transport.request(url, { method: 'POST', headers }, (res) => {
+						let data = '';
+						res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+						res.on('end', () => {
+							if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+								resolve(data);
+							} else {
+								// Include response body for better error diagnostics
+								reject(new Error(`CTRL-A API ${res.statusCode}: ${data || res.statusMessage}`));
+							}
+						});
 					});
+					req.on('error', reject);
+					req.write(body);
+					req.end();
+				});
+
+				const data = JSON.parse(response);
+
+				// Persist conversationId for multi-turn conversations
+				if (data.conversationId) {
+					session.conversationId = data.conversationId;
+				}
+
+				// Emit thinking/reasoning if present
+				if (data.thinking) {
 					this._onDidSessionProgress.fire({
 						session: sessionUri,
-						type: 'tool_complete',
-						toolCallId,
-						success: true,
-						pastTenseMessage: `Ran \`${tc.tool}\``,
-						toolOutput: typeof tc.result === 'string' ? tc.result.substring(0, 2000) : JSON.stringify(tc.result).substring(0, 2000),
+						type: 'reasoning',
+						content: data.thinking,
 					});
 				}
-			}
 
-			// Emit the main response content
-			const content = data.response || data.message || 'No response from agent.';
-			this._onDidSessionProgress.fire({
-				session: sessionUri,
-				type: 'delta',
-				messageId: generateUuid(),
-				content,
-			});
+				// Emit tool calls as tool_start + tool_complete events
+				if (data.toolCalls && Array.isArray(data.toolCalls)) {
+					for (const tc of data.toolCalls) {
+						const toolCallId = generateUuid();
+						this._onDidSessionProgress.fire({
+							session: sessionUri,
+							type: 'tool_start',
+							toolCallId,
+							toolName: tc.tool,
+							displayName: tc.tool,
+							invocationMessage: `Running \`${tc.tool}\``,
+							toolInput: typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input),
+						});
+						this._onDidSessionProgress.fire({
+							session: sessionUri,
+							type: 'tool_complete',
+							toolCallId,
+							success: true,
+							pastTenseMessage: `Ran \`${tc.tool}\``,
+							toolOutput: typeof tc.result === 'string' ? tc.result.substring(0, 2000) : JSON.stringify(tc.result).substring(0, 2000),
+						});
+					}
+				}
 
-			// Emit token usage if available
-			if (data.inputTokens || data.outputTokens) {
+				// Emit the main response content
+				const content = data.response || data.message || 'No response from agent.';
 				this._onDidSessionProgress.fire({
 					session: sessionUri,
-					type: 'usage',
-					inputTokens: data.inputTokens,
-					outputTokens: data.outputTokens,
-					model: data.model,
+					type: 'delta',
+					messageId: generateUuid(),
+					content,
 				});
-			}
 
-			this._logService.info(`[DevClaw:${sessionId}] Response from ${data.agentName || data.agentId} (${data.model}), ${data.toolCalls?.length || 0} tool calls`);
+				// Emit token usage if available
+				if (data.inputTokens || data.outputTokens) {
+					this._onDidSessionProgress.fire({
+						session: sessionUri,
+						type: 'usage',
+						inputTokens: data.inputTokens,
+						outputTokens: data.outputTokens,
+						model: data.model,
+					});
+				}
+
+				this._logService.info(`[DevClaw:${sessionId}] CTRL-A response from ${data.agentName || data.agentId} (${data.model}), ${data.toolCalls?.length || 0} tool calls`);
+			}
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
 			this._logService.error(`[DevClaw:${sessionId}] Error: ${errorMsg}`);
 
-			// Parse structured error from CTRL-A if available
+			// Parse structured error from the active backend if available
+			const backendName = config.backend === 'openclaw' ? 'OpenClaw' : 'CTRL-A';
+			const backendUrl = config.backend === 'openclaw' ? config.openclawUrl : config.baseUrl;
 			let displayMsg: string;
 			if (errorMsg.includes('ECONNREFUSED')) {
-				displayMsg = `Cannot reach CTRL-A at ${config.baseUrl}. Make sure CTRL-A is running.`;
-			} else if (errorMsg.includes('CTRL-A API')) {
+				displayMsg = `Cannot reach ${backendName} at ${backendUrl}. Make sure ${backendName} is running.`;
+			} else if (errorMsg.includes('CTRL-A API') || errorMsg.includes('OpenClaw API')) {
 				// Try to extract the JSON error body
 				try {
 					const jsonStart = errorMsg.indexOf('{');
