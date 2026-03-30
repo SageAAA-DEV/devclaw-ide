@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  DevTeam IDE - Settings Pane
- *  CTRL-A connection config, BYOK keys, future: Git/DB/MCP config.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { ViewPane, IViewPaneOptions } from '../../../browser/parts/views/viewPane.js';
@@ -14,15 +14,35 @@ import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { IThemeService } from '../../../../platform/theme/common/themeService.js';
 import { IHoverService } from '../../../../platform/hover/browser/hover.js';
 import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
+import { IDevClawService } from './devclawService.js';
+import { IOpenClawDaemonService } from '../../../../platform/openclaw/common/openclawDaemon.js';
+
+const PROVIDERS = ['Anthropic', 'OpenAI', 'MiniMax', 'OpenRouter'] as const;
+type Provider = typeof PROVIDERS[number];
+
+const PROVIDER_PLACEHOLDERS: Record<Provider, string> = {
+	'Anthropic': 'sk-ant-...',
+	'OpenAI': 'sk-...',
+	'MiniMax': 'eyJ...',
+	'OpenRouter': 'sk-or-...',
+};
 
 export class DevTeamSettingsPane extends ViewPane {
 
 	static readonly ID = 'devteam.settingsView';
 
 	private readonly STORAGE_KEYS = {
+		// Backend selection
+		backend: 'devteam.backend',
+		// OpenClaw daemon
+		openclawPort: 'devteam.openclaw.port',
+		openclawToken: 'devteam.openclaw.token',
+		openclawProvider: 'devteam.openclaw.provider',
+		// CTRL-A Cloud
 		ctrlAUrl: 'devteam.ctrlA.url',
-		ctrlAMode: 'devteam.ctrlA.mode',
 		ctrlAApiKey: 'devteam.ctrlA.apiKey',
+		// Legacy (kept for migration compat)
+		ctrlAMode: 'devteam.ctrlA.mode',
 		ctrlACloudUrl: 'devteam.ctrlA.cloudUrl',
 		ctrlACloudApiKey: 'devteam.ctrlA.cloudApiKey',
 		ctrlALocalUrl: 'devteam.ctrlA.localUrl',
@@ -33,8 +53,13 @@ export class DevTeamSettingsPane extends ViewPane {
 		keyOpenRouter: 'devteam.key.openrouter',
 	};
 
-	private urlInput!: HTMLInputElement;
-	private apiKeyInput!: HTMLInputElement;
+	// Section containers toggled by backend switch
+	private openclawSection!: HTMLElement;
+	private ctrlASection!: HTMLElement;
+
+	// Direct element references (avoid DOM queries)
+	private openclawApiKeyInput!: HTMLInputElement;
+	private backendToggleBtns: HTMLButtonElement[] = [];
 
 	constructor(
 		options: IViewPaneOptions,
@@ -48,6 +73,8 @@ export class DevTeamSettingsPane extends ViewPane {
 		@IThemeService themeService: IThemeService,
 		@IHoverService hoverService: IHoverService,
 		@IStorageService private readonly storageService: IStorageService,
+		@IDevClawService private readonly devClawService: IDevClawService,
+		@IOpenClawDaemonService private readonly daemonService: IOpenClawDaemonService,
 	) {
 		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, hoverService);
 	}
@@ -71,29 +98,31 @@ export class DevTeamSettingsPane extends ViewPane {
 		const content = document.createElement('div');
 		content.className = 'devteam-settings';
 
-		// --- Section: CTRL-A Instance ---
-		const urlRow = this.createInput('Server URL', 'ctrlAUrl', 'https://your-ctrl-a.onrender.com', 'text');
-		this.urlInput = urlRow.querySelector('.devteam-settings-input') as HTMLInputElement;
+		// --- Section: Backend Toggle ---
+		content.appendChild(this.createSection('Backend', [
+			this.createBackendToggle(),
+		]));
 
-		const apiKeyRow = this.createInput('API Key', 'ctrlAApiKey', 'Enter CTRL-A API key', 'password');
-		this.apiKeyInput = apiKeyRow.querySelector('.devteam-settings-input') as HTMLInputElement;
+		// --- Section: OpenClaw (local daemon) ---
+		this.openclawSection = this.createSection('OpenClaw (Local Daemon)', [
+			this.createDaemonStatus(),
+			this.createProviderDropdown(),
+			this.createOpenClawApiKeyInput(),
+			this.createRestartDaemonButton(),
+			this.createPortDisplay(),
+		]);
+		content.appendChild(this.openclawSection);
 
-		const modeToggle = this.createModeToggle();
-
-		content.appendChild(this.createSection('CTRL-A Instance', [
-			modeToggle,
-			urlRow,
-			apiKeyRow,
+		// --- Section: CTRL-A Cloud ---
+		this.ctrlASection = this.createSection('CTRL-A Cloud', [
+			this.createInput('Server URL', 'ctrlAUrl', 'https://your-ctrl-a.onrender.com', 'text'),
+			this.createInput('API Key', 'ctrlAApiKey', 'Enter CTRL-A API key', 'password'),
 			this.createTestButton(),
-		]));
+		]);
+		content.appendChild(this.ctrlASection);
 
-		// --- Section: BYOK Keys ---
-		content.appendChild(this.createSection('Bring Your Own Keys', [
-			this.createInput('Anthropic', 'keyAnthropic', 'sk-ant-...', 'password'),
-			this.createInput('OpenAI', 'keyOpenAI', 'sk-...', 'password'),
-			this.createInput('MiniMax', 'keyMiniMax', 'eyJ...', 'password'),
-			this.createInput('OpenRouter', 'keyOpenRouter', 'sk-or-...', 'password'),
-		]));
+		// Apply initial visibility
+		this.applyBackendVisibility();
 
 		// --- Section: Git (stub) ---
 		content.appendChild(this.createSection('Git Integration', [
@@ -116,6 +145,235 @@ export class DevTeamSettingsPane extends ViewPane {
 	protected override layoutBody(height: number, width: number): void {
 		super.layoutBody(height, width);
 	}
+
+	// ---------------------------------------------------------------------------
+	// Backend toggle
+	// ---------------------------------------------------------------------------
+
+	private applyBackendVisibility(): void {
+		const backend = this.storageService.get(this.STORAGE_KEYS.backend, StorageScope.APPLICATION, 'openclaw');
+		if (this.openclawSection && this.ctrlASection) {
+			this.openclawSection.style.display = backend === 'openclaw' ? 'block' : 'none';
+			this.ctrlASection.style.display = backend === 'ctrl-a' ? 'block' : 'none';
+		}
+	}
+
+	private createBackendToggle(): HTMLElement {
+		const row = document.createElement('div');
+		row.className = 'devteam-settings-row';
+
+		const labelEl = document.createElement('label');
+		labelEl.className = 'devteam-settings-label';
+		labelEl.textContent = 'Active Backend';
+		row.appendChild(labelEl);
+
+		const toggleContainer = document.createElement('div');
+		toggleContainer.className = 'devteam-toggle-container';
+
+		const currentBackend = this.storageService.get(this.STORAGE_KEYS.backend, StorageScope.APPLICATION, 'openclaw');
+
+		const options: Array<{ value: string; label: string }> = [
+			{ value: 'openclaw', label: 'OpenClaw' },
+			{ value: 'ctrl-a', label: 'CTRL-A Cloud' },
+		];
+
+		this.backendToggleBtns = [];
+		for (const opt of options) {
+			const btn = document.createElement('button');
+			btn.className = `devteam-toggle-btn ${currentBackend === opt.value ? 'active' : ''}`;
+			btn.textContent = opt.label;
+			btn.addEventListener('click', () => {
+				this.storageService.store(this.STORAGE_KEYS.backend, opt.value, StorageScope.APPLICATION, StorageTarget.USER);
+				for (const b of this.backendToggleBtns) {
+					b.classList.remove('active');
+				}
+				btn.classList.add('active');
+				this.applyBackendVisibility();
+				// Reconnect with new backend
+				try {
+					this.devClawService.reconnect();
+				} catch {
+					// Service may not be available yet — silently ignore
+				}
+			});
+			this.backendToggleBtns.push(btn);
+			toggleContainer.appendChild(btn);
+		}
+
+		row.appendChild(toggleContainer);
+		return row;
+	}
+
+	// ---------------------------------------------------------------------------
+	// OpenClaw section helpers
+	// ---------------------------------------------------------------------------
+
+	private createDaemonStatus(): HTMLElement {
+		const row = document.createElement('div');
+		row.className = 'devteam-settings-row';
+
+		const labelEl = document.createElement('label');
+		labelEl.className = 'devteam-settings-label';
+		labelEl.textContent = 'Daemon Status';
+		row.appendChild(labelEl);
+
+		const statusRow = document.createElement('div');
+		statusRow.className = 'devteam-daemon-status-row';
+
+		const dot = document.createElement('span');
+		const isReady = this.daemonService?.isReady ?? false;
+		dot.className = `devteam-daemon-dot ${isReady ? 'running' : 'stopped'}`;
+
+		const text = document.createElement('span');
+		text.className = 'devteam-daemon-status-text';
+		text.textContent = isReady ? 'Running' : 'Stopped';
+
+		statusRow.appendChild(dot);
+		statusRow.appendChild(text);
+		row.appendChild(statusRow);
+		return row;
+	}
+
+	private createProviderDropdown(): HTMLElement {
+		const row = document.createElement('div');
+		row.className = 'devteam-settings-row';
+
+		const labelEl = document.createElement('label');
+		labelEl.className = 'devteam-settings-label';
+		labelEl.textContent = 'Provider';
+		row.appendChild(labelEl);
+
+		const select = document.createElement('select');
+		select.className = 'devteam-settings-select';
+
+		const savedProvider = this.storageService.get(this.STORAGE_KEYS.openclawProvider, StorageScope.APPLICATION, 'Anthropic') as Provider;
+
+		for (const provider of PROVIDERS) {
+			const option = document.createElement('option');
+			option.value = provider;
+			option.textContent = provider;
+			option.selected = provider === savedProvider;
+			select.appendChild(option);
+		}
+
+		select.addEventListener('change', () => {
+			const provider = select.value as Provider;
+			this.storageService.store(this.STORAGE_KEYS.openclawProvider, provider, StorageScope.APPLICATION, StorageTarget.USER);
+			// Update the API key placeholder via direct reference (no DOM query)
+			if (this.openclawApiKeyInput) {
+				this.openclawApiKeyInput.placeholder = PROVIDER_PLACEHOLDERS[provider] ?? '';
+			}
+			// Restart daemon with new provider env vars
+			try {
+				this.daemonService.updateKeys();
+			} catch {
+				// Service may not be available yet
+			}
+		});
+
+		row.appendChild(select);
+		return row;
+	}
+
+	private createOpenClawApiKeyInput(): HTMLElement {
+		const row = document.createElement('div');
+		row.className = 'devteam-settings-row';
+
+		const labelEl = document.createElement('label');
+		labelEl.className = 'devteam-settings-label';
+		labelEl.textContent = 'API Key';
+		row.appendChild(labelEl);
+
+		const input = document.createElement('input');
+		input.className = 'devteam-settings-input';
+		input.type = 'password';
+		input.spellcheck = false;
+
+		const savedProvider = this.storageService.get(this.STORAGE_KEYS.openclawProvider, StorageScope.APPLICATION, 'Anthropic') as Provider;
+		input.placeholder = PROVIDER_PLACEHOLDERS[savedProvider] ?? 'Enter API key';
+
+		const saved = this.storageService.get(this.STORAGE_KEYS.openclawToken, StorageScope.APPLICATION, '');
+		if (saved) {
+			input.value = saved;
+		}
+
+		// Store direct reference for provider dropdown to update placeholder
+		this.openclawApiKeyInput = input;
+
+		input.addEventListener('change', () => {
+			this.storageService.store(this.STORAGE_KEYS.openclawToken, input.value, StorageScope.APPLICATION, StorageTarget.USER);
+			// Restart daemon with new key
+			try {
+				this.daemonService.updateKeys();
+			} catch {
+				// Service may not be available yet
+			}
+		});
+
+		row.appendChild(input);
+		return row;
+	}
+
+	private createRestartDaemonButton(): HTMLElement {
+		const row = document.createElement('div');
+		row.className = 'devteam-settings-row';
+
+		const btn = document.createElement('button');
+		btn.className = 'devteam-btn devteam-btn-test';
+		btn.textContent = 'Restart Daemon';
+
+		const status = document.createElement('span');
+		status.className = 'devteam-connection-status';
+		status.textContent = '';
+
+		btn.addEventListener('click', async () => {
+			btn.disabled = true;
+			btn.textContent = 'Restarting...';
+			status.textContent = '';
+			try {
+				await this.daemonService.updateKeys();
+				status.textContent = 'Daemon restarted';
+				status.className = 'devteam-connection-status success';
+			} catch {
+				status.textContent = 'Restart failed';
+				status.className = 'devteam-connection-status error';
+			}
+			btn.disabled = false;
+			btn.textContent = 'Restart Daemon';
+		});
+
+		row.appendChild(btn);
+		row.appendChild(status);
+		return row;
+	}
+
+	private createPortDisplay(): HTMLElement {
+		const row = document.createElement('div');
+		row.className = 'devteam-settings-row';
+
+		const labelEl = document.createElement('label');
+		labelEl.className = 'devteam-settings-label';
+		labelEl.textContent = 'Daemon Port';
+		row.appendChild(labelEl);
+
+		const input = document.createElement('input');
+		input.className = 'devteam-settings-input';
+		input.type = 'text';
+		input.readOnly = true;
+		input.spellcheck = false;
+
+		const savedPort = this.storageService.get(this.STORAGE_KEYS.openclawPort, StorageScope.APPLICATION, '18789');
+		input.value = savedPort;
+		input.style.opacity = '0.6';
+		input.style.cursor = 'default';
+
+		row.appendChild(input);
+		return row;
+	}
+
+	// ---------------------------------------------------------------------------
+	// Shared helpers
+	// ---------------------------------------------------------------------------
 
 	private createSection(title: string, children: HTMLElement[]): HTMLElement {
 		const section = document.createElement('div');
@@ -190,8 +448,8 @@ export class DevTeamSettingsPane extends ViewPane {
 
 			try {
 				// Use Electron's net module to bypass CORS restrictions
-				const electronFetch = (globalThis as any).fetch;
-				const res = await electronFetch(`${url}/api/health`, {
+				const gFetch = globalThis.fetch as typeof fetch;
+				const res = await gFetch(`${url}/api/health`, {
 					signal: AbortSignal.timeout(10000),
 					headers: { 'x-api-key': this.storageService.get(this.STORAGE_KEYS.ctrlAApiKey, StorageScope.APPLICATION, '') },
 				});
@@ -214,68 +472,6 @@ export class DevTeamSettingsPane extends ViewPane {
 
 		row.appendChild(btn);
 		row.appendChild(status);
-		return row;
-	}
-
-	private createModeToggle(): HTMLElement {
-		const row = document.createElement('div');
-		row.className = 'devteam-settings-row';
-
-		const labelEl = document.createElement('label');
-		labelEl.className = 'devteam-settings-label';
-		labelEl.textContent = 'Mode';
-		row.appendChild(labelEl);
-
-		const toggleContainer = document.createElement('div');
-		toggleContainer.className = 'devteam-toggle-container';
-
-		const currentMode = this.storageService.get(this.STORAGE_KEYS.ctrlAMode, StorageScope.APPLICATION, 'cloud');
-
-		for (const opt of ['cloud', 'local']) {
-			const btn = document.createElement('button');
-			btn.className = `devteam-toggle-btn ${currentMode === opt ? 'active' : ''}`;
-			btn.textContent = opt.charAt(0).toUpperCase() + opt.slice(1);
-			btn.addEventListener('click', () => {
-				// Save current values to the current mode's storage
-				const oldMode = this.storageService.get(this.STORAGE_KEYS.ctrlAMode, StorageScope.APPLICATION, 'cloud');
-				if (oldMode === 'cloud') {
-					this.storageService.store(this.STORAGE_KEYS.ctrlACloudUrl, this.urlInput.value, StorageScope.APPLICATION, StorageTarget.USER);
-					this.storageService.store(this.STORAGE_KEYS.ctrlACloudApiKey, this.apiKeyInput.value, StorageScope.APPLICATION, StorageTarget.USER);
-				} else {
-					this.storageService.store(this.STORAGE_KEYS.ctrlALocalUrl, this.urlInput.value, StorageScope.APPLICATION, StorageTarget.USER);
-					this.storageService.store(this.STORAGE_KEYS.ctrlALocalApiKey, this.apiKeyInput.value, StorageScope.APPLICATION, StorageTarget.USER);
-				}
-
-				// Switch mode
-				this.storageService.store(this.STORAGE_KEYS.ctrlAMode, opt, StorageScope.APPLICATION, StorageTarget.USER);
-				toggleContainer.querySelectorAll('.devteam-toggle-btn').forEach(b => b.classList.remove('active'));
-				btn.classList.add('active');
-
-				// Load the new mode's values
-				if (opt === 'cloud') {
-					const cloudUrl = this.storageService.get(this.STORAGE_KEYS.ctrlACloudUrl, StorageScope.APPLICATION, '');
-					const cloudKey = this.storageService.get(this.STORAGE_KEYS.ctrlACloudApiKey, StorageScope.APPLICATION, '');
-					this.urlInput.value = cloudUrl;
-					this.urlInput.placeholder = 'https://your-ctrl-a.onrender.com';
-					this.apiKeyInput.value = cloudKey;
-					// Update the active URL/key storage
-					this.storageService.store(this.STORAGE_KEYS.ctrlAUrl, cloudUrl, StorageScope.APPLICATION, StorageTarget.USER);
-					this.storageService.store(this.STORAGE_KEYS.ctrlAApiKey, cloudKey, StorageScope.APPLICATION, StorageTarget.USER);
-				} else {
-					const localUrl = this.storageService.get(this.STORAGE_KEYS.ctrlALocalUrl, StorageScope.APPLICATION, 'http://localhost:1045');
-					const localKey = this.storageService.get(this.STORAGE_KEYS.ctrlALocalApiKey, StorageScope.APPLICATION, 'dev-key');
-					this.urlInput.value = localUrl;
-					this.urlInput.placeholder = 'http://localhost:1045';
-					this.apiKeyInput.value = localKey;
-					// Update the active URL/key storage
-					this.storageService.store(this.STORAGE_KEYS.ctrlAUrl, localUrl, StorageScope.APPLICATION, StorageTarget.USER);
-					this.storageService.store(this.STORAGE_KEYS.ctrlAApiKey, localKey, StorageScope.APPLICATION, StorageTarget.USER);
-				}
-			});
-			toggleContainer.appendChild(btn);
-		}
-
-		row.appendChild(toggleContainer);
 		return row;
 	}
 
@@ -341,6 +537,30 @@ const SETTINGS_STYLES = `
 		color: #444;
 	}
 
+	.devteam-settings-select {
+		background: #1a1a2e;
+		border: 1px solid #2a2a3e;
+		border-radius: 4px;
+		padding: 8px 10px;
+		color: #e0e0e0;
+		font-family: inherit;
+		font-size: 12px;
+		outline: none;
+		cursor: pointer;
+		transition: border-color 0.15s;
+		appearance: none;
+		-webkit-appearance: none;
+	}
+
+	.devteam-settings-select:focus {
+		border-color: #00d4ff;
+	}
+
+	.devteam-settings-select option {
+		background: #1a1a2e;
+		color: #e0e0e0;
+	}
+
 	.devteam-toggle-container {
 		display: flex;
 		gap: 0;
@@ -368,6 +588,34 @@ const SETTINGS_STYLES = `
 	.devteam-toggle-btn.active {
 		background: #00d4ff22;
 		color: #00d4ff;
+	}
+
+	.devteam-daemon-status-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.devteam-daemon-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+
+	.devteam-daemon-dot.running {
+		background: #4caf50;
+		box-shadow: 0 0 6px #4caf5088;
+	}
+
+	.devteam-daemon-dot.stopped {
+		background: #f44336;
+		box-shadow: 0 0 6px #f4433688;
+	}
+
+	.devteam-daemon-status-text {
+		color: #e0e0e0;
+		font-size: 12px;
 	}
 
 	.devteam-btn-test {
