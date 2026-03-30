@@ -279,7 +279,7 @@ export class OpenClawDaemonManager extends Disposable implements IOpenClawDaemon
 		try {
 			const child = spawn(
 				process.execPath,
-				[entryPoint, 'gateway', '--bind', '127.0.0.1', '--port', String(port)],
+				[entryPoint, 'gateway', '--bind', 'loopback', '--port', String(port)],
 				{
 					detached: true,
 					stdio: ['ignore', logStream, logStream],
