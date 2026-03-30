@@ -3,36 +3,11 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { IBackendClient, ChatResponse, AgentInfo } from './backendClient.js';
+
 export interface CtrlAConfig {
 	baseUrl: string;      // e.g. http://localhost:3000
 	apiKey: string;
-}
-
-export interface ChatMessage {
-	role: 'user' | 'assistant' | 'system';
-	content: string;
-}
-
-export interface ChatResponse {
-	response: string;
-	agentId: string;
-	conversationId: string;
-	toolCalls?: ToolCallResult[];
-	sentiment?: { type: string; intensity: number };
-}
-
-export interface ToolCallResult {
-	name: string;
-	result: unknown;
-}
-
-export interface AgentInfo {
-	id: string;
-	name: string;
-	role: string;
-	vertical: string;
-	status: string;
-	description?: string;
 }
 
 export type StreamEventType = 'response' | 'tool-start' | 'tool-complete' | 'error' | 'pong' | 'agent-selected';
@@ -45,7 +20,7 @@ export interface StreamEvent {
 
 type StreamListener = (event: StreamEvent) => void;
 
-export class CtrlAClient {
+export class CtrlAClient implements IBackendClient {
 
 	private ws: WebSocket | null = null;
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
