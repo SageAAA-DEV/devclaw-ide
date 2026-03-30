@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) SageAAA. All rights reserved.
- *  Licensed under the Proprietary License.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 // DevClaw IDE contribution point
@@ -27,6 +27,10 @@ class DevClawAgentContribution extends DevClawAgentRegistration implements IWork
 }
 
 registerWorkbenchContribution2(DevClawAgentContribution.ID, DevClawAgentContribution, WorkbenchPhase.AfterRestored);
+
+// --- Register Welcome Wizard (first-launch BYOK setup) ---
+import { WelcomeWizardContribution } from './welcomeWizard.js';
+registerWorkbenchContribution2(WelcomeWizardContribution.ID, WelcomeWizardContribution, WorkbenchPhase.AfterRestored);
 
 import { DevTeamSettingsPane } from './settingsPane.js';
 import { DevClawAgentsPane } from './agentsPane.js';
@@ -102,7 +106,7 @@ function registerAgentCommand(id: string, label: string, promptPrefix: string) {
 		const selection = editor?.getSelection?.();
 		const model = editor?.getModel?.();
 		let selectedText = '';
-		if (selection && model && 'getValueInRange' in model) {
+		if (selection && model && typeof (model as { getValueInRange?(sel: unknown): string }).getValueInRange === 'function') {
 			selectedText = (model as { getValueInRange(sel: unknown): string }).getValueInRange(selection);
 		}
 
