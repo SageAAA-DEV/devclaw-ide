@@ -1,7 +1,7 @@
 # OpenClaw Inside — Embedded AI Engine for DevTeam IDE
 
 **Date:** 2026-03-30
-**Status:** Approved
+**Status:** Approved (Rev 2 — post spec review)
 **Ship date:** 2026-04-01 (v1)
 
 ---
@@ -11,6 +11,12 @@
 OpenClaw ships baked into DevTeam IDE as the primary AI engine. "OpenClaw Inside" — like Intel Inside. One build, one binary. OpenClaw is always there. CTRL-A Cloud is an optional upgrade for managed multi-agent orchestration.
 
 The agent is a **persistent daemon** that outlives the IDE window. Close the IDE, the agent keeps working — watching deploys, listening on channels (Slack/Discord/Telegram), executing proactively. Reopen the IDE, it reconnects and shows what happened.
+
+## Known Limitations (v1)
+
+- **API keys stored in plaintext** in `~/.openclaw/config.json`. v1.x will migrate to OS keychain (Windows Credential Manager, macOS Keychain, libsecret on Linux).
+- **`/tools/invoke` endpoint** is listed but not wired into the chat UI for v1. Tool calls happen through the chat completions flow. Direct tool invocation is post-launch.
+- **"While you were away" recap** is post-launch. On reconnect, the IDE just re-establishes the connection silently.
 
 ## Architecture
 
@@ -48,7 +54,11 @@ DevTeam IDE (single build)
 | API bridge | Two clients side-by-side | `openClawClient.ts` + `ctrlAClient.ts`, service picks based on config. Clean separation. |
 | BYOK wizard | One key on wizard, rest in advanced | Fast onboarding. Anthropic/OpenAI/MiniMax/OpenRouter all supported. |
 | Demo scope (4/1) | Full experience | Wizard, streaming chat, agent roster, workspace context |
-| OpenClaw source | `F:\lenovo backup\devStuff\openclaw-main` (v2026.3.30) | Latest features and bug fixes |
+| OpenClaw source | `F:\lenovo backup\devStuff\openclaw-main` (v2026.3.30) | Latest features and bug fixes. Copied into repo at `resources/openclaw/` for reproducible builds. |
+| Client interface | Shared `IBackendClient` interface | Both `OpenClawClient` and `CtrlAClient` implement it. `getClient()` returns `IBackendClient`, not `CtrlAClient`. |
+| Windows daemon | Task Scheduler (user-level) | No admin required. Runs on login. Restart on failure. Startup folder is too fragile. |
+| API key storage (v1) | Plaintext `~/.openclaw/config.json` | Known limitation. v1.x migrates to OS keychain. |
+| Version tracking | `package.json` version field | Bundled vs installed `~/.openclaw/engine/package.json` version compared on IDE launch. |
 
 ## Section 1: OpenClaw Inside — Bundle + Daemon
 
@@ -63,11 +73,12 @@ OpenClaw ships in `resources/openclaw/` inside the IDE package. This is the comp
 2. Generates a random gateway token, saves to `~/.openclaw/config.json`
 3. Selects a fixed port (default 18789, or next available), saves to config
 4. Registers OpenClaw as a background service:
-   - **Windows:** Startup task via `AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/` or Windows Task Scheduler
-   - **Mac:** launchd plist in `~/Library/LaunchAgents/`
-   - **Linux:** systemd user unit in `~/.config/systemd/user/`
+   - **Windows:** Task Scheduler user-level task (no admin). Trigger: user logon. Action: `node ~/.openclaw/engine/openclaw.mjs gateway --bind 127.0.0.1 --port <port>`. Restart on failure (3 retries, 10s delay).
+   - **Mac:** launchd plist in `~/Library/LaunchAgents/com.devteam.openclaw.plist`. KeepAlive: true. StandardOutPath/StandardErrorPath: `~/.openclaw/logs/`.
+   - **Linux:** systemd user unit in `~/.config/systemd/user/openclaw.service`. Restart=on-failure. RestartSec=10.
 5. Starts the daemon
-6. Waits for `/health` to return OK
+6. Waits for `/health` to return OK (30s timeout, polls every 1s)
+7. **If health check fails after 30s:** Show error screen: "Agent failed to start. Check your setup or try restarting." with a Retry button and a link to logs at `~/.openclaw/logs/`.
 
 **IDE opens (daemon already running):**
 1. Reads `~/.openclaw/config.json` for port + token
@@ -79,8 +90,14 @@ OpenClaw ships in `resources/openclaw/` inside the IDE package. This is the comp
 
 **IDE updates:**
 - New IDE version bundles newer OpenClaw in `resources/openclaw/`
-- On launch, compares bundled version vs `~/.openclaw/engine/` version
-- If newer, copies over and restarts daemon
+- On launch, reads `version` field from bundled `resources/openclaw/package.json` vs `~/.openclaw/engine/package.json`
+- If bundled version is newer (semver compare), copies over and restarts daemon
+- Version mismatch logged to `~/.openclaw/logs/upgrade.log`
+
+**Port conflict on subsequent starts:**
+- Daemon reads saved port from `~/.openclaw/config.json`
+- If port is in use by another process, scans 18790-18899, then any free port
+- Updates config.json with new port so IDE can find it
 
 ### Daemon Manager
 
@@ -104,7 +121,26 @@ Environment variables passed to daemon:
 - `OPENROUTER_API_KEY` — if configured
 - `OPENCLAW_CONFIG_DIR=~/.openclaw`
 
-## Section 2: OpenClaw Client Layer
+## Section 2: Backend Client Interface & OpenClaw Client
+
+### Shared Interface
+
+New file: `src/vs/workbench/contrib/devteam/common/backendClient.ts`
+
+```typescript
+export interface IBackendClient {
+  chat(agentId: string, message: string, conversationId?: string): Promise<ChatResponse>;
+  chatStream(agentId: string, message: string, onChunk: (text: string) => void): Promise<string>;
+  getHealth(): Promise<{ status: string; version: string }>;
+  listAgents(): Promise<AgentInfo[]>;
+  isConnected(): boolean;
+  dispose(): void;
+}
+```
+
+Both `CtrlAClient` and `OpenClawClient` implement `IBackendClient`. The existing `CtrlAClient` gets this interface added (non-breaking — it already has these methods). `DevClawService.getClient()` returns `IBackendClient` instead of `CtrlAClient`. WebSocket methods (`connectWs`, `sendChat`, `selectAgent`, `on`, `onAll`) stay on `CtrlAClient` only — they are not part of the shared interface. `DevClawService` conditionally calls WebSocket methods only when backend is `'ctrl-a'`.
+
+### OpenClaw Client
 
 New file: `src/vs/workbench/contrib/devteam/common/openClawClient.ts`
 
@@ -149,7 +185,7 @@ Agent persona (devin, scout, sage, ink) is injected as the system prompt — Ope
 OpenClawClient returns the same `ChatResponse` shape as CtrlAClient:
 - `response` — extracted from `choices[0].message.content`
 - `agentId` — set from the locally-selected agent
-- `conversationId` — managed client-side (OpenClaw doesn't track conversations the same way)
+- `conversationId` — generated client-side as `crypto.randomUUID()` on first message, persisted in-memory per chat session. Passed to OpenClaw via the `user` field (OpenClaw derives stable sessions from `user`). Reset when user starts a new chat.
 
 ### DevClawService Changes
 
@@ -212,13 +248,17 @@ This context is included in the system prompt for every message, regardless of b
 
 `devclawAgent.ts` (IAgent implementation in Electron main process) gets a parallel path:
 
-- Reads `devteam.backend` setting
+- Backend selection via environment variables (same pattern as existing `DEVCLAW_CTRL_A_URL`):
+  - `DEVCLAW_BACKEND=openclaw|ctrl-a` (default: `openclaw`)
+  - `DEVCLAW_OPENCLAW_PORT` — read from `~/.openclaw/config.json` at startup
+  - `DEVCLAW_OPENCLAW_TOKEN` — read from `~/.openclaw/config.json` at startup
+  - These env vars are set by the Electron main process before spawning the agent host, bridging renderer config to the node side.
 - If `'openclaw'`: Node `http` request to `localhost:<port>/v1/chat/completions` with Bearer token
 - If `'ctrl-a'`: existing behavior (`/api/chat` with `x-app-key`)
 - Response parsing adapts per backend:
   - OpenClaw: `choices[0].message.content` → delta events
   - CTRL-A: `response` field → delta events (existing)
-- Conversation tracking: client-side for OpenClaw, server-side for CTRL-A
+- Conversation tracking: client-side UUID for OpenClaw (passed in `user` field), server-side for CTRL-A
 
 ## Section 6: Settings Pane Updates
 
@@ -247,16 +287,18 @@ This context is included in the system prompt for every message, regardless of b
 | File | Purpose |
 |------|---------|
 | `src/vs/platform/openclaw/node/openclawDaemonManager.ts` | Daemon lifecycle (install, start, stop, health, upgrade) |
-| `src/vs/workbench/contrib/devteam/common/openClawClient.ts` | HTTP client for OpenClaw (OpenAI format) |
+| `src/vs/workbench/contrib/devteam/common/backendClient.ts` | `IBackendClient` interface shared by both clients |
+| `src/vs/workbench/contrib/devteam/common/openClawClient.ts` | HTTP client for OpenClaw (OpenAI format), implements `IBackendClient` |
 | `src/vs/workbench/contrib/devteam/browser/welcomeWizard.ts` | First-launch wizard UI |
 
 ### Modified Files
 | File | Changes |
 |------|---------|
-| `src/vs/workbench/contrib/devteam/browser/devclawService.ts` | Backend selection, OpenClaw client integration |
+| `src/vs/workbench/contrib/devteam/common/ctrlAClient.ts` | Add `implements IBackendClient`, no logic changes |
+| `src/vs/workbench/contrib/devteam/browser/devclawService.ts` | Backend selection, return `IBackendClient` from `getClient()`, conditional WebSocket |
 | `src/vs/workbench/contrib/devteam/browser/devclawAgents.ts` | Route through OpenClaw when selected |
 | `src/vs/workbench/contrib/devteam/browser/settingsPane.ts` | Backend toggle, OpenClaw settings, daemon status |
-| `src/vs/platform/agentHost/node/devclaw/devclawAgent.ts` | Dual backend support in IAgent provider |
+| `src/vs/platform/agentHost/node/devclaw/devclawAgent.ts` | Dual backend support via env vars |
 | `src/vs/workbench/contrib/devteam/browser/devteam.contribution.ts` | Register wizard, daemon manager |
 
 ### Bundled
