@@ -12,7 +12,7 @@ export interface OpenClawConfig {
 
 /** Hardcoded agent roster — OpenClaw has no agent discovery endpoint. */
 const OPENCLAW_AGENTS: AgentInfo[] = [
-	{ id: 'ctrl-a', name: 'CTRL-A', role: 'General Assistant', vertical: 'platform', status: 'available', description: 'Core CTRL-A platform agent' },
+	{ id: 'openclaw', name: 'OpenClaw', role: 'General Assistant', vertical: 'platform', status: 'available', description: 'Core OpenClaw platform agent' },
 	{ id: 'devin', name: 'Devin', role: 'Senior Engineer', vertical: 'dev', status: 'available', description: 'Full-stack development & architecture' },
 	{ id: 'scout', name: 'Scout', role: 'Research Analyst', vertical: 'research', status: 'available', description: 'Market research & competitive analysis' },
 	{ id: 'sage', name: 'Sage', role: 'Business Strategist', vertical: 'strategy', status: 'available', description: 'Business strategy & product decisions' },

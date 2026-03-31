@@ -48,7 +48,7 @@ export class DevClawAgent extends Disposable implements IAgent {
 		return {
 			provider: 'devclaw',
 			displayName: 'Agent Host - DevClaw',
-			description: 'AI agent team via OpenClaw (embedded) or CTRL-A (cloud)',
+			description: 'AI agent team via OpenClaw (embedded) or OpenClaw (cloud)',
 			requiresAuth: false,
 		};
 	}
@@ -64,7 +64,7 @@ export class DevClawAgent extends Disposable implements IAgent {
 	// ---- config --------------------------------------------------------------
 
 	private _getConfig(): DevClawConfig {
-		const backend = (process.env['DEVCLAW_BACKEND'] || 'openclaw') as 'openclaw' | 'ctrl-a';
+		const backend = (process.env['DEVCLAW_BACKEND'] || 'openclaw') as 'openclaw' | 'openclaw';
 		return {
 			backend,
 			openclawUrl: `http://127.0.0.1:${process.env['DEVCLAW_OPENCLAW_PORT'] || '18789'}`,
@@ -97,7 +97,7 @@ export class DevClawAgent extends Disposable implements IAgent {
 
 	async listModels(): Promise<IAgentModelInfo[]> {
 		return [
-			{ provider: this.id, id: 'ctrl-a', name: 'CTRL-A (Router)', maxContextWindow: 128000, supportsVision: false, supportsReasoningEffort: false },
+			{ provider: this.id, id: 'openclaw', name: 'OpenClaw (Router)', maxContextWindow: 128000, supportsVision: false, supportsReasoningEffort: false },
 			{ provider: this.id, id: 'devin', name: 'Devin (Lead Engineer)', maxContextWindow: 128000, supportsVision: false, supportsReasoningEffort: false },
 			{ provider: this.id, id: 'scout', name: 'Scout (Researcher)', maxContextWindow: 128000, supportsVision: false, supportsReasoningEffort: false },
 			{ provider: this.id, id: 'sage', name: 'Sage (Code Reviewer)', maxContextWindow: 128000, supportsVision: false, supportsReasoningEffort: false },
@@ -109,7 +109,7 @@ export class DevClawAgent extends Disposable implements IAgent {
 		const sessionId = config?.session ? AgentSession.id(config.session) : generateUuid();
 		this._logService.info(`[DevClaw] Creating session: ${sessionId}`);
 
-		const session = new DevClawSession(sessionId, config?.model || 'ctrl-a');
+		const session = new DevClawSession(sessionId, config?.model || 'openclaw');
 		this._sessions.set(sessionId, session);
 
 		const uri = AgentSession.uri(this.id, sessionId);
@@ -127,7 +127,7 @@ export class DevClawAgent extends Disposable implements IAgent {
 
 		const config = this._getConfig();
 		if (!this._isConfigured()) {
-			const backendName = config.backend === 'openclaw' ? 'OpenClaw' : 'CTRL-A';
+			const backendName = config.backend === 'openclaw' ? 'OpenClaw' : 'OpenClaw';
 			const hint = config.backend === 'openclaw'
 				? 'Set `DEVCLAW_OPENCLAW_PORT` and `DEVCLAW_OPENCLAW_TOKEN` environment variables, or configure your connection in DevClaw Settings.'
 				: 'Set `DEVCLAW_CTRL_A_URL` and `DEVCLAW_CTRL_A_APP_KEY` environment variables, or configure your connection in DevClaw Settings.';
@@ -206,7 +206,7 @@ export class DevClawAgent extends Disposable implements IAgent {
 
 				this._logService.info(`[DevClaw:${sessionId}] OpenClaw response via model openclaw:${session.agentId}`);
 			} else {
-				// --- CTRL-A path (POST /api/chat) ---
+				// --- OpenClaw path (POST /api/chat) ---
 				const url = new URL(`${config.baseUrl}/api/chat`);
 				const transport = url.protocol === 'https:' ? https : http;
 
@@ -235,7 +235,7 @@ export class DevClawAgent extends Disposable implements IAgent {
 								resolve(data);
 							} else {
 								// Include response body for better error diagnostics
-								reject(new Error(`CTRL-A API ${res.statusCode}: ${data || res.statusMessage}`));
+								reject(new Error(`OpenClaw API ${res.statusCode}: ${data || res.statusMessage}`));
 							}
 						});
 					});
@@ -304,19 +304,19 @@ export class DevClawAgent extends Disposable implements IAgent {
 					});
 				}
 
-				this._logService.info(`[DevClaw:${sessionId}] CTRL-A response from ${data.agentName || data.agentId} (${data.model}), ${data.toolCalls?.length || 0} tool calls`);
+				this._logService.info(`[DevClaw:${sessionId}] OpenClaw response from ${data.agentName || data.agentId} (${data.model}), ${data.toolCalls?.length || 0} tool calls`);
 			}
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
 			this._logService.error(`[DevClaw:${sessionId}] Error: ${errorMsg}`);
 
 			// Parse structured error from the active backend if available
-			const backendName = config.backend === 'openclaw' ? 'OpenClaw' : 'CTRL-A';
+			const backendName = config.backend === 'openclaw' ? 'OpenClaw' : 'OpenClaw';
 			const backendUrl = config.backend === 'openclaw' ? config.openclawUrl : config.baseUrl;
 			let displayMsg: string;
 			if (errorMsg.includes('ECONNREFUSED')) {
 				displayMsg = `Cannot reach ${backendName} at ${backendUrl}. Make sure ${backendName} is running.`;
-			} else if (errorMsg.includes('CTRL-A API') || errorMsg.includes('OpenClaw API')) {
+			} else if (errorMsg.includes('OpenClaw API') || errorMsg.includes('OpenClaw API')) {
 				// Try to extract the JSON error body
 				try {
 					const jsonStart = errorMsg.indexOf('{');
@@ -416,7 +416,7 @@ export class DevClawAgent extends Disposable implements IAgent {
 class DevClawSession {
 	readonly startTime = Date.now();
 	lastMessage = '';
-	/** CTRL-A conversationId, set after first response. */
+	/** OpenClaw conversationId, set after first response. */
 	conversationId: string | undefined;
 
 	constructor(

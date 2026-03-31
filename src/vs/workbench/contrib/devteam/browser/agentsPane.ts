@@ -41,7 +41,7 @@ export class DevClawAgentsPane extends ViewPane {
 		{ id: 'scout', name: 'Scout', role: 'Researcher', status: 'idle', icon: '\uD83D\uDD0D', specialty: 'Code analysis, docs, Stack Overflow deep dives' },
 		{ id: 'sage', name: 'Sage', role: 'Code Reviewer', status: 'idle', icon: '\uD83D\uDEE1', specialty: 'Bugs, security, performance improvements' },
 		{ id: 'ink', name: 'Ink', role: 'Technical Writer', status: 'idle', icon: '\u270F', specialty: 'Docs, comments, PRs, READMEs' },
-		{ id: 'ctrl-a', name: 'CTRL-A', role: 'Agent Router', status: 'idle', icon: '\uD83C\uDFAF', specialty: 'Routes to the right specialist automatically' },
+		{ id: 'openclaw', name: 'OpenClaw', role: 'Agent Router', status: 'idle', icon: '\uD83C\uDFAF', specialty: 'Routes to the right specialist automatically' },
 	];
 
 	constructor(
@@ -134,9 +134,9 @@ export class DevClawAgentsPane extends ViewPane {
 	}
 
 	private updateConnectionStatus(): void {
-		const url = this.storageService.get('devteam.ctrlA.url', StorageScope.APPLICATION, '');
+		const url = this.storageService.get('devteam.openclaw.url', StorageScope.APPLICATION, '');
 		if (url) {
-			this.statusLabel.textContent = 'Connected to CTRL-A';
+			this.statusLabel.textContent = 'Connected to OpenClaw';
 			this.statusLabel.className = 'devclaw-status-text connected';
 		} else {
 			this.statusLabel.textContent = 'Not connected \u2014 showing default team';
@@ -145,8 +145,8 @@ export class DevClawAgentsPane extends ViewPane {
 	}
 
 	private async loadAgents(): Promise<void> {
-		const url = this.storageService.get('devteam.ctrlA.url', StorageScope.APPLICATION, '');
-		const apiKey = this.storageService.get('devteam.ctrlA.apiKey', StorageScope.APPLICATION, '');
+		const url = this.storageService.get('devteam.openclaw.url', StorageScope.APPLICATION, '');
+		const apiKey = this.storageService.get('devteam.openclaw.apiKey', StorageScope.APPLICATION, '');
 
 		if (!url) {
 			this.renderAgents(this.defaultAgents);

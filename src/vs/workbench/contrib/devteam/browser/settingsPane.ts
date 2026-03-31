@@ -38,15 +38,15 @@ export class DevTeamSettingsPane extends ViewPane {
 		openclawPort: 'devteam.openclaw.port',
 		openclawToken: 'devteam.openclaw.token',
 		openclawProvider: 'devteam.openclaw.provider',
-		// CTRL-A Cloud
-		ctrlAUrl: 'devteam.ctrlA.url',
-		ctrlAApiKey: 'devteam.ctrlA.apiKey',
+		// OpenClaw Cloud
+		openclawUrl: 'devteam.openclaw.url',
+		openclawApiKey: 'devteam.openclaw.apiKey',
 		// Legacy (kept for migration compat)
-		ctrlAMode: 'devteam.ctrlA.mode',
-		ctrlACloudUrl: 'devteam.ctrlA.cloudUrl',
-		ctrlACloudApiKey: 'devteam.ctrlA.cloudApiKey',
-		ctrlALocalUrl: 'devteam.ctrlA.localUrl',
-		ctrlALocalApiKey: 'devteam.ctrlA.localApiKey',
+		openclawMode: 'devteam.openclaw.mode',
+		openclawCloudUrl: 'devteam.openclaw.cloudUrl',
+		openclawCloudApiKey: 'devteam.openclaw.cloudApiKey',
+		openclawLocalUrl: 'devteam.openclaw.localUrl',
+		openclawLocalApiKey: 'devteam.openclaw.localApiKey',
 		keyAnthropic: 'devteam.key.anthropic',
 		keyOpenAI: 'devteam.key.openai',
 		keyMiniMax: 'devteam.key.minimax',
@@ -55,7 +55,7 @@ export class DevTeamSettingsPane extends ViewPane {
 
 	// Section containers toggled by backend switch
 	private openclawSection!: HTMLElement;
-	private ctrlASection!: HTMLElement;
+	private openclawSection!: HTMLElement;
 
 	// Direct element references (avoid DOM queries)
 	private openclawApiKeyInput!: HTMLInputElement;
@@ -113,13 +113,13 @@ export class DevTeamSettingsPane extends ViewPane {
 		]);
 		content.appendChild(this.openclawSection);
 
-		// --- Section: CTRL-A Cloud ---
-		this.ctrlASection = this.createSection('CTRL-A Cloud', [
-			this.createInput('Server URL', 'ctrlAUrl', 'https://your-ctrl-a.onrender.com', 'text'),
-			this.createInput('API Key', 'ctrlAApiKey', 'Enter CTRL-A API key', 'password'),
+		// --- Section: OpenClaw Cloud ---
+		this.openclawSection = this.createSection('OpenClaw Cloud', [
+			this.createInput('Server URL', 'openclawUrl', 'https://your-openclaw.onrender.com', 'text'),
+			this.createInput('API Key', 'openclawApiKey', 'Enter OpenClaw API key', 'password'),
 			this.createTestButton(),
 		]);
-		content.appendChild(this.ctrlASection);
+		content.appendChild(this.openclawSection);
 
 		// Apply initial visibility
 		this.applyBackendVisibility();
@@ -152,9 +152,9 @@ export class DevTeamSettingsPane extends ViewPane {
 
 	private applyBackendVisibility(): void {
 		const backend = this.storageService.get(this.STORAGE_KEYS.backend, StorageScope.APPLICATION, 'openclaw');
-		if (this.openclawSection && this.ctrlASection) {
+		if (this.openclawSection && this.openclawSection) {
 			this.openclawSection.style.display = backend === 'openclaw' ? 'block' : 'none';
-			this.ctrlASection.style.display = backend === 'ctrl-a' ? 'block' : 'none';
+			this.openclawSection.style.display = backend === 'openclaw' ? 'block' : 'none';
 		}
 	}
 
@@ -174,7 +174,7 @@ export class DevTeamSettingsPane extends ViewPane {
 
 		const options: Array<{ value: string; label: string }> = [
 			{ value: 'openclaw', label: 'OpenClaw' },
-			{ value: 'ctrl-a', label: 'CTRL-A Cloud' },
+			{ value: 'openclaw', label: 'OpenClaw Cloud' },
 		];
 
 		this.backendToggleBtns = [];
@@ -437,7 +437,7 @@ export class DevTeamSettingsPane extends ViewPane {
 			btn.textContent = 'Testing...';
 			status.textContent = '';
 
-			const url = this.storageService.get(this.STORAGE_KEYS.ctrlAUrl, StorageScope.APPLICATION, '');
+			const url = this.storageService.get(this.STORAGE_KEYS.openclawUrl, StorageScope.APPLICATION, '');
 			if (!url) {
 				status.textContent = 'No URL configured';
 				status.className = 'devteam-connection-status error';
@@ -451,7 +451,7 @@ export class DevTeamSettingsPane extends ViewPane {
 				const gFetch = globalThis.fetch as typeof fetch;
 				const res = await gFetch(`${url}/api/health`, {
 					signal: AbortSignal.timeout(10000),
-					headers: { 'x-api-key': this.storageService.get(this.STORAGE_KEYS.ctrlAApiKey, StorageScope.APPLICATION, '') },
+					headers: { 'x-api-key': this.storageService.get(this.STORAGE_KEYS.openclawApiKey, StorageScope.APPLICATION, '') },
 				});
 				if (res.ok) {
 					const data = await res.json();

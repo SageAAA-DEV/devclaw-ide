@@ -10,7 +10,7 @@
  *
  *  Supports two backends:
  *    - 'openclaw' (default) — local OpenClaw gateway via OpenAI-compatible API
- *    - 'ctrl-a'             — CTRL-A Cloud via REST + WebSocket
+ *    - 'openclaw'             — OpenClaw Cloud via REST + WebSocket
  */
 
 import { Emitter, Event } from '../../../../base/common/event.js';
@@ -19,10 +19,10 @@ import { createDecorator } from '../../../../platform/instantiation/common/insta
 import { IStorageService, StorageScope } from '../../../../platform/storage/common/storage.js';
 import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
 import { IBackendClient, type ChatResponse } from '../common/backendClient.js';
-import { CtrlAClient, type StreamEvent } from '../common/ctrlAClient.js';
+import { OpenClawClient, type StreamEvent } from '../common/openclawClient.js';
 import { OpenClawClient } from '../common/openClawClient.js';
 
-export type BackendType = 'openclaw' | 'ctrl-a';
+export type BackendType = 'openclaw' | 'openclaw';
 
 export const IDevClawService = createDecorator<IDevClawService>('devClawService');
 
@@ -53,14 +53,14 @@ export class DevClawService extends Disposable implements IDevClawService {
 
 	declare readonly _serviceBrand: undefined;
 
-	/** Active backend client — either OpenClawClient or CtrlAClient. */
+	/** Active backend client — either OpenClawClient or OpenClawClient. */
 	private client: IBackendClient;
 
-	/** Kept separately so WebSocket agent-select calls work when CTRL-A backend is active. */
-	private ctrlAClient: CtrlAClient | null = null;
+	/** Kept separately so WebSocket agent-select calls work when OpenClaw backend is active. */
+	private openclawClient: OpenClawClient | null = null;
 
 	private _backendType: BackendType;
-	private _selectedAgentId = 'ctrl-a';
+	private _selectedAgentId = 'openclaw';
 	private _isConnected = false;
 
 	private readonly _onAgentSelected = this._register(new Emitter<string>());
@@ -99,26 +99,26 @@ export class DevClawService extends Disposable implements IDevClawService {
 			const token = this.storageService.get('devteam.openclaw.token', StorageScope.APPLICATION, '');
 			const baseUrl = `http://localhost:${port || '18789'}`;
 
-			this.ctrlAClient = null;
+			this.openclawClient = null;
 			return new OpenClawClient({ baseUrl, token: token || '' });
 		}
 
-		// 'ctrl-a' backend
-		const url = this.storageService.get('devteam.ctrlA.url', StorageScope.APPLICATION, '');
-		const apiKey = this.storageService.get('devteam.ctrlA.apiKey', StorageScope.APPLICATION, '');
+		// 'openclaw' backend
+		const url = this.storageService.get('devteam.openclaw.url', StorageScope.APPLICATION, '');
+		const apiKey = this.storageService.get('devteam.openclaw.apiKey', StorageScope.APPLICATION, '');
 
-		const ctrlA = new CtrlAClient({
+		const openclaw = new OpenClawClient({
 			baseUrl: url || 'http://localhost:3000',
 			apiKey: apiKey || '',
 		});
 
 		// Wire WebSocket stream events through the service emitter
-		ctrlA.onAll((event) => {
+		openclaw.onAll((event) => {
 			this._onStreamEvent.fire(event);
 		});
 
-		this.ctrlAClient = ctrlA;
-		return ctrlA;
+		this.openclawClient = openclaw;
+		return openclaw;
 	}
 
 	// ---------------------------------------------------------------------------
@@ -129,9 +129,9 @@ export class DevClawService extends Disposable implements IDevClawService {
 		this._selectedAgentId = agentId;
 		this._onAgentSelected.fire(agentId);
 
-		// Notify CTRL-A backend via WebSocket if connected
-		if (this._isConnected && this.ctrlAClient) {
-			this.ctrlAClient.selectAgent(agentId);
+		// Notify OpenClaw backend via WebSocket if connected
+		if (this._isConnected && this.openclawClient) {
+			this.openclawClient.selectAgent(agentId);
 		}
 	}
 
@@ -143,7 +143,7 @@ export class DevClawService extends Disposable implements IDevClawService {
 		this._onChatMessage.fire({ role: 'user', content: message });
 
 		if (!this._isConnected) {
-			const backendName = this._backendType === 'openclaw' ? 'OpenClaw' : 'CTRL-A';
+			const backendName = this._backendType === 'openclaw' ? 'OpenClaw' : 'OpenClaw';
 			this._onChatMessage.fire({
 				role: 'system',
 				content: `Not connected to ${backendName}. Configure your connection in DevClaw Settings.`,
@@ -172,7 +172,7 @@ export class DevClawService extends Disposable implements IDevClawService {
 		this._onChatMessage.fire({ role: 'user', content: message });
 
 		if (!this._isConnected) {
-			const backendName = this._backendType === 'openclaw' ? 'OpenClaw' : 'CTRL-A';
+			const backendName = this._backendType === 'openclaw' ? 'OpenClaw' : 'OpenClaw';
 			this._onChatMessage.fire({
 				role: 'system',
 				content: `Not connected to ${backendName}. Configure your connection in DevClaw Settings.`,
@@ -212,7 +212,7 @@ export class DevClawService extends Disposable implements IDevClawService {
 	reconnect(): void {
 		// Dispose the current client cleanly
 		this.client.dispose();
-		this.ctrlAClient = null;
+		this.openclawClient = null;
 		this._isConnected = false;
 
 		// Re-read backend type in case it changed in settings
@@ -239,9 +239,9 @@ export class DevClawService extends Disposable implements IDevClawService {
 			this._isConnected = true;
 			this._onConnectionChanged.fire(true);
 
-			// Connect WebSocket only when CTRL-A backend is active
-			if (this.ctrlAClient) {
-				this.ctrlAClient.connectWs();
+			// Connect WebSocket only when OpenClaw backend is active
+			if (this.openclawClient) {
+				this.openclawClient.connectWs();
 			}
 		} catch {
 			this._isConnected = false;
@@ -251,7 +251,7 @@ export class DevClawService extends Disposable implements IDevClawService {
 
 	override dispose(): void {
 		this.client.dispose();
-		this.ctrlAClient = null;
+		this.openclawClient = null;
 		super.dispose();
 	}
 }

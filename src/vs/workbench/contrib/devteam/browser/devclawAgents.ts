@@ -32,7 +32,7 @@ interface DevClawAgentDef {
 const DEVCLAW_EXTENSION_ID = new ExtensionIdentifier('sageaaa.devclaw');
 
 const AGENT_PERSONAS: Record<string, string> = {
-	'ctrl-a': 'I route your request to the best specialist on the team. Just tell me what you need \u2014 I\u2019ll pick the right agent automatically.',
+	'openclaw': 'I route your request to the best specialist on the team. Just tell me what you need \u2014 I\u2019ll pick the right agent automatically.',
 	'devin': 'I\u2019m your lead engineer. I architect systems, build features, and make the big decisions about code structure and patterns.',
 	'scout': 'I\u2019m your researcher. I dig into code, docs, and Stack Overflow. Ask me to investigate anything \u2014 I\u2019ll find the answer.',
 	'sage': 'I catch what you miss. Send me code and I\u2019ll find bugs, security issues, and performance improvements.',
@@ -41,9 +41,9 @@ const AGENT_PERSONAS: Record<string, string> = {
 
 const DEVCLAW_AGENTS: DevClawAgentDef[] = [
 	{
-		id: 'devclaw.ctrl-a',
-		name: 'ctrl-a',
-		fullName: 'CTRL-A',
+		id: 'devclaw.openclaw',
+		name: 'openclaw',
+		fullName: 'OpenClaw',
 		description: 'Routes your request to the best specialist agent',
 		isDefault: true,
 		slashCommands: [
@@ -365,7 +365,7 @@ export class DevClawAgentRegistration extends Disposable {
 		const backend = this.devClawService.backendType;
 
 		if (!this.devClawService.isConnected) {
-			const backendName = backend === 'openclaw' ? 'OpenClaw' : 'CTRL-A';
+			const backendName = backend === 'openclaw' ? 'OpenClaw' : 'OpenClaw';
 			progress([{
 				kind: 'markdownContent',
 				content: new MarkdownString(
@@ -386,9 +386,9 @@ export class DevClawAgentRegistration extends Disposable {
 			// Gather local workspace context (files, active editor, referenced paths)
 			const localContext = await this.gatherLocalContext(message);
 
-			// All agents route through ctrl-a on the backend (it's the router)
-			// The persona/role context tells ctrl-a which specialist voice to use
-			const agentId = 'ctrl-a';
+			// All agents route through openclaw on the backend (it's the router)
+			// The persona/role context tells openclaw which specialist voice to use
+			const agentId = 'openclaw';
 			const roleContext = persona ? `[Respond as ${def.fullName}: ${persona}]\n\n` : '';
 			const capabilities = `[DEVCLAW IDE CAPABILITIES: You ARE running inside DevClaw IDE. You CAN create and edit files. When the user asks you to create or modify a file, respond with the full file content in a markdown code block with the filename as the language tag, like:\n\`\`\`path/to/file.ts\nfile content here\n\`\`\`\nThe user can click Apply to write it to disk. You CAN see the workspace files. You have full local context. Act like you have filesystem access — because DevClaw handles it for you.]\n\n`;
 			const fullMessage = roleContext + capabilities + message + localContext;
@@ -407,7 +407,7 @@ export class DevClawAgentRegistration extends Disposable {
 				streamedResponse = response.response;
 				data = { response: streamedResponse };
 			} else {
-				// CTRL-A path — direct REST fetch to /api/chat
+				// OpenClaw path — direct REST fetch to /api/chat
 				const url = this.storageService.get('devteam.ctrlA.url', StorageScope.APPLICATION, '');
 				const apiKey = this.storageService.get('devteam.ctrlA.apiKey', StorageScope.APPLICATION, '');
 
@@ -434,7 +434,7 @@ export class DevClawAgentRegistration extends Disposable {
 					} catch { /* use status text */ }
 					progress([{
 						kind: 'markdownContent',
-						content: new MarkdownString(`**CTRL-A Error:** ${errorDetail}`),
+						content: new MarkdownString(`**OpenClaw Error:** ${errorDetail}`),
 					}]);
 					return { metadata: {} };
 				}
@@ -496,7 +496,7 @@ export class DevClawAgentRegistration extends Disposable {
 			const errorMsg = err instanceof Error ? err.message : String(err);
 			progress([{
 				kind: 'markdownContent',
-				content: new MarkdownString(`**Connection error:** ${errorMsg}\n\nCheck your CTRL-A connection in DevClaw Settings.`),
+				content: new MarkdownString(`**Connection error:** ${errorMsg}\n\nCheck your OpenClaw connection in DevClaw Settings.`),
 			}]);
 			return { metadata: {} };
 		}
