@@ -202,7 +202,7 @@ const supportsAllAttachments: Required<IChatAgentAttachmentCapabilities> = {
 	supportsHandOffs: true,
 };
 
-const DISCLAIMER = localize('chatDisclaimer', "Powered by CTRL-A \u2014 your AI agent team");
+const DISCLAIMER = localize('chatDisclaimer', "Powered by OpenClaw \u2014 your AI assistant");
 
 export class ChatWidget extends Disposable implements IChatWidget {
 

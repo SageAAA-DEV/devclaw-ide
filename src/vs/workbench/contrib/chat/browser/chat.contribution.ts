@@ -725,7 +725,7 @@ configurationRegistry.registerConfiguration({
 		},
 		[AgentHostEnabledSettingId]: {
 			type: 'boolean',
-			description: nls.localize('chat.agentHost.enabled', "When enabled, agents run in a separate agent host process connected to CTRL-A."),
+			description: nls.localize('chat.agentHost.enabled', "When enabled, agents run in a separate agent host process."),
 			default: true,
 			tags: ['experimental', 'advanced'],
 		},

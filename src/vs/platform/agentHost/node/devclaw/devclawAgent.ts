@@ -64,13 +64,10 @@ export class DevClawAgent extends Disposable implements IAgent {
 	// ---- config --------------------------------------------------------------
 
 	private _getConfig(): DevClawConfig {
-		const backend = (process.env['DEVCLAW_BACKEND'] || 'openclaw') as 'openclaw' | 'openclaw';
 		return {
-			backend,
-			openclawUrl: `http://127.0.0.1:${process.env['DEVCLAW_OPENCLAW_PORT'] || '18789'}`,
-			openclawToken: process.env['DEVCLAW_OPENCLAW_TOKEN'] || '',
-			baseUrl: process.env['DEVCLAW_CTRL_A_URL'] || 'http://localhost:3000',
-			appKey: process.env['DEVCLAW_CTRL_A_APP_KEY'] || '',
+			backend: 'openclaw',
+			openclawUrl: `http://127.0.0.1:${process.env['OPENCLAW_PORT'] || '18789'}`,
+			openclawToken: process.env['OPENCLAW_TOKEN'] || '',
 		};
 	}
 
@@ -123,10 +120,8 @@ export class DevClawAgent extends Disposable implements IAgent {
 
 		const config = this._getConfig();
 		if (!this._isConfigured()) {
-			const backendName = config.backend === 'openclaw' ? 'OpenClaw' : 'OpenClaw';
-			const hint = config.backend === 'openclaw'
-				? 'Set `DEVCLAW_OPENCLAW_PORT` and `DEVCLAW_OPENCLAW_TOKEN` environment variables, or configure your connection in DevClaw Settings.'
-				: 'Set `DEVCLAW_CTRL_A_URL` and `DEVCLAW_CTRL_A_APP_KEY` environment variables, or configure your connection in DevClaw Settings.';
+			const backendName = 'OpenClaw';
+			const hint = 'Set `OPENCLAW_PORT` and `OPENCLAW_TOKEN` environment variables, or configure your connection in Settings.';
 			this._onDidSessionProgress.fire({
 				session: sessionUri,
 				type: 'delta',

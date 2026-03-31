@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) SageAAA, Inc. All rights reserved.
- *  Licensed under the Proprietary License.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
@@ -57,7 +57,7 @@ class DevClawPrivacyConsent implements IWorkbenchContribution {
 				'',
 				'You can change this anytime in Settings > Privacy.',
 				'',
-				'Learn exactly what we collect: https://devclaw.sageaaa.com/telemetry',
+				'Learn exactly what we collect: https://github.com/bsci83/devclaw-oss/wiki/telemetry',
 			].join('\n'),
 			primaryButton: 'Accept Analytics & Crash Reports',
 			cancelButton: 'No Thanks',

@@ -3,7 +3,7 @@
   "version": "1.114.0",
   "distro": "a981e7362565b4058f3bfd7604f8ab8c4f85101b",
   "author": {
-    "name": "SageAAA, Inc."
+    "name": "OpenClaw Contributors"
   },
   "license": "MIT",
   "main": "./out/main.js",
@@ -236,10 +236,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sageaaa/devclaw.git"
+    "url": "https://github.com/bsci83/devclaw-oss.git"
   },
   "bugs": {
-    "url": "https://github.com/sageaaa/devclaw/issues"
+    "url": "https://github.com/bsci83/devclaw-oss/issues"
   },
   "optionalDependencies": {
     "windows-foreground-love": "0.6.1"
