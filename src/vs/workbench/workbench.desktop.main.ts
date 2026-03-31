@@ -24,7 +24,6 @@ import './electron-browser/desktop.contribution.js';
 
 // DevTeam IDE
 import './contrib/devteam/browser/devteam.contribution.js';
-import '../platform/openclaw/node/openclawDaemonManager.js'; // registers IOpenClawDaemonService singleton
 
 //#endregion
 

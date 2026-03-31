@@ -15,6 +15,7 @@ import { Codicon } from '../../../../base/common/codicons.js';
 import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
 import './devclawService.js'; // registers the singleton
+import './openclawDaemonStub.js'; // browser-safe IOpenClawDaemonService stub
 import './privacyConsent.js'; // Privacy consent dialog on first launch
 import './settingsImport.js'; // Settings import commands for VS Code, Cursor, Windsurf, Antigravity
 
