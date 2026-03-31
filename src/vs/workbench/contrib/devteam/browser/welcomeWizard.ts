@@ -235,11 +235,11 @@ export class WelcomeWizardContribution extends Disposable implements IWorkbenchC
 		// Header
 		const header = document.createElement('h1');
 		header.className = 'devteam-wizard-header';
-		header.textContent = 'Welcome to DevTeam';
+		header.textContent = 'Welcome to DevClaw IDE';
 
 		const subtitle = document.createElement('p');
 		subtitle.className = 'devteam-wizard-subtitle';
-		subtitle.textContent = 'Your AI agent is ready. Add an API key to get started.';
+		subtitle.textContent = 'Your OpenClaw gateway is ready. Add your API key to get started.';
 
 		// Provider field
 		const providerGroup = document.createElement('div');
