@@ -54,8 +54,8 @@ export class DevTeamSettingsPane extends ViewPane {
 	};
 
 	// Section containers toggled by backend switch
-	private openclawSection!: HTMLElement;
-	private openclawSection!: HTMLElement;
+	private openclawLocalSection!: HTMLElement;
+	private openclawCloudSection!: HTMLElement;
 
 	// Direct element references (avoid DOM queries)
 	private openclawApiKeyInput!: HTMLInputElement;
@@ -104,22 +104,22 @@ export class DevTeamSettingsPane extends ViewPane {
 		]));
 
 		// --- Section: OpenClaw (local daemon) ---
-		this.openclawSection = this.createSection('OpenClaw (Local Daemon)', [
+		this.openclawLocalSection = this.createSection('OpenClaw (Local Daemon)', [
 			this.createDaemonStatus(),
 			this.createProviderDropdown(),
 			this.createOpenClawApiKeyInput(),
 			this.createRestartDaemonButton(),
 			this.createPortDisplay(),
 		]);
-		content.appendChild(this.openclawSection);
+		content.appendChild(this.openclawLocalSection);
 
 		// --- Section: OpenClaw Cloud ---
-		this.openclawSection = this.createSection('OpenClaw Cloud', [
+		this.openclawCloudSection = this.createSection('OpenClaw Cloud', [
 			this.createInput('Server URL', 'openclawUrl', 'https://your-openclaw.onrender.com', 'text'),
 			this.createInput('API Key', 'openclawApiKey', 'Enter OpenClaw API key', 'password'),
 			this.createTestButton(),
 		]);
-		content.appendChild(this.openclawSection);
+		content.appendChild(this.openclawCloudSection);
 
 		// Apply initial visibility
 		this.applyBackendVisibility();
@@ -152,9 +152,9 @@ export class DevTeamSettingsPane extends ViewPane {
 
 	private applyBackendVisibility(): void {
 		const backend = this.storageService.get(this.STORAGE_KEYS.backend, StorageScope.APPLICATION, 'openclaw');
-		if (this.openclawSection && this.openclawSection) {
-			this.openclawSection.style.display = backend === 'openclaw' ? 'block' : 'none';
-			this.openclawSection.style.display = backend === 'openclaw' ? 'block' : 'none';
+		if (this.openclawLocalSection && this.openclawCloudSection) {
+			this.openclawLocalSection.style.display = backend === 'openclaw' ? 'block' : 'none';
+			this.openclawCloudSection.style.display = backend === 'openclaw' ? 'none' : 'block';
 		}
 	}
 
@@ -265,7 +265,7 @@ export class DevTeamSettingsPane extends ViewPane {
 			}
 			// Restart daemon with new provider env vars
 			try {
-				this.daemonService.updateKeys();
+				this.daemonService.updateKeys({ provider: provider.toLowerCase() });
 			} catch {
 				// Service may not be available yet
 			}
@@ -304,7 +304,8 @@ export class DevTeamSettingsPane extends ViewPane {
 			this.storageService.store(this.STORAGE_KEYS.openclawToken, input.value, StorageScope.APPLICATION, StorageTarget.USER);
 			// Restart daemon with new key
 			try {
-				this.daemonService.updateKeys();
+				const provider = this.storageService.get(this.STORAGE_KEYS.openclawProvider, StorageScope.APPLICATION, 'Anthropic') as Provider;
+				this.daemonService.updateKeys({ provider: provider.toLowerCase() });
 			} catch {
 				// Service may not be available yet
 			}
@@ -331,7 +332,8 @@ export class DevTeamSettingsPane extends ViewPane {
 			btn.textContent = 'Restarting...';
 			status.textContent = '';
 			try {
-				await this.daemonService.updateKeys();
+				const provider = this.storageService.get(this.STORAGE_KEYS.openclawProvider, StorageScope.APPLICATION, 'Anthropic') as Provider;
+				await this.daemonService.updateKeys({ provider: provider.toLowerCase() });
 				status.textContent = 'Daemon restarted';
 				status.className = 'devteam-connection-status success';
 			} catch {

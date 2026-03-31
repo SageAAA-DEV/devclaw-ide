@@ -366,32 +366,32 @@ export class WelcomeWizardContribution extends Disposable implements IWorkbenchC
 		try {
 			// Step 3 — install daemon
 			this._setStatus(statusArea, '', 'Installing OpenClaw daemon...');
-			await this.daemonService.install();
+			const daemonConfig = await this.daemonService.install();
 
 			// Step 4 — persist API key for selected provider
 			this._setStatus(statusArea, '', 'Saving API key...');
-			await this.daemonService.updateKeys({ provider, key: apiKey });
+			const keyField = `${provider}Key` as keyof Pick<import('../../../../platform/openclaw/common/openclawDaemon.js').IOpenClawDaemonConfig, 'anthropicKey' | 'openaiKey' | 'minimaxKey' | 'openrouterKey'>;
+			await this.daemonService.updateKeys({ provider, [keyField]: apiKey });
 
-			// Step 6 — save backend preference
+			// Step 5 — save backend preference
 			this.storageService.store(BACKEND_KEY, 'openclaw', StorageScope.APPLICATION, StorageTarget.MACHINE);
+
+			// Step 6 — persist port + token from install result
+			if (daemonConfig?.port) {
+				this.storageService.store(OPENCLAW_PORT_KEY, String(daemonConfig.port), StorageScope.APPLICATION, StorageTarget.MACHINE);
+			}
+			if (daemonConfig?.token) {
+				this.storageService.store(OPENCLAW_TOKEN_KEY, daemonConfig.token, StorageScope.APPLICATION, StorageTarget.MACHINE);
+			}
 
 			// Step 7 — start daemon
 			this._setStatus(statusArea, '', 'Starting agent daemon...');
-			const result = await this.daemonService.start();
+			const started = await this.daemonService.start();
 
-			// Step 5 — persist port + token from start result
-			if (result?.port) {
-				this.storageService.store(OPENCLAW_PORT_KEY, String(result.port), StorageScope.APPLICATION, StorageTarget.MACHINE);
-			}
-			if (result?.token) {
-				this.storageService.store(OPENCLAW_TOKEN_KEY, result.token, StorageScope.APPLICATION, StorageTarget.MACHINE);
-			}
-
-			// Step 8 — health check
+			// Step 8 — verify daemon started
 			this._setStatus(statusArea, '', 'Verifying connection...');
-			const healthy = await this.daemonService.healthCheck();
-			if (!healthy) {
-				throw new Error('Daemon health check failed. The agent process may not have started correctly.');
+			if (!started) {
+				throw new Error('Daemon failed to start. The agent process may not have started correctly.');
 			}
 
 			// Mark wizard complete and open chat

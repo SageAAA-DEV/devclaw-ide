@@ -8,9 +8,7 @@
  *  Central service that holds the active AI backend client, selected agent state,
  *  and bridges communication between Chat, Agents, and Settings panes.
  *
- *  Supports two backends:
- *    - 'openclaw' (default) — local OpenClaw gateway via OpenAI-compatible API
- *    - 'openclaw'             — OpenClaw Cloud via REST + WebSocket
+ *  Backend: OpenClaw (local daemon) via OpenAI-compatible API.
  */
 
 import { Emitter, Event } from '../../../../base/common/event.js';
@@ -19,10 +17,15 @@ import { createDecorator } from '../../../../platform/instantiation/common/insta
 import { IStorageService, StorageScope } from '../../../../platform/storage/common/storage.js';
 import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
 import { IBackendClient, type ChatResponse } from '../common/backendClient.js';
-import { OpenClawClient, type StreamEvent } from '../common/openclawClient.js';
 import { OpenClawClient } from '../common/openClawClient.js';
 
-export type BackendType = 'openclaw' | 'openclaw';
+export type BackendType = 'openclaw';
+
+/** Generic stream event — placeholder for future SSE/streaming support. */
+export interface StreamEvent {
+	type: string;
+	data?: unknown;
+}
 
 export const IDevClawService = createDecorator<IDevClawService>('devClawService');
 
@@ -53,11 +56,8 @@ export class DevClawService extends Disposable implements IDevClawService {
 
 	declare readonly _serviceBrand: undefined;
 
-	/** Active backend client — either OpenClawClient or OpenClawClient. */
+	/** Active backend client — OpenClawClient (local daemon). */
 	private client: IBackendClient;
-
-	/** Kept separately so WebSocket agent-select calls work when OpenClaw backend is active. */
-	private openclawClient: OpenClawClient | null = null;
 
 	private _backendType: BackendType;
 	private _selectedAgentId = 'openclaw';
@@ -94,31 +94,11 @@ export class DevClawService extends Disposable implements IDevClawService {
 	// ---------------------------------------------------------------------------
 
 	private createClient(): IBackendClient {
-		if (this._backendType === 'openclaw') {
-			const port = this.storageService.get('devteam.openclaw.port', StorageScope.APPLICATION, '18789');
-			const token = this.storageService.get('devteam.openclaw.token', StorageScope.APPLICATION, '');
-			const baseUrl = `http://localhost:${port || '18789'}`;
+		const port = this.storageService.get('devteam.openclaw.port', StorageScope.APPLICATION, '18789');
+		const token = this.storageService.get('devteam.openclaw.token', StorageScope.APPLICATION, '');
+		const baseUrl = `http://localhost:${port || '18789'}`;
 
-			this.openclawClient = null;
-			return new OpenClawClient({ baseUrl, token: token || '' });
-		}
-
-		// 'openclaw' backend
-		const url = this.storageService.get('devteam.openclaw.url', StorageScope.APPLICATION, '');
-		const apiKey = this.storageService.get('devteam.openclaw.apiKey', StorageScope.APPLICATION, '');
-
-		const openclaw = new OpenClawClient({
-			baseUrl: url || 'http://localhost:3000',
-			apiKey: apiKey || '',
-		});
-
-		// Wire WebSocket stream events through the service emitter
-		openclaw.onAll((event) => {
-			this._onStreamEvent.fire(event);
-		});
-
-		this.openclawClient = openclaw;
-		return openclaw;
+		return new OpenClawClient({ baseUrl, token: token || '' });
 	}
 
 	// ---------------------------------------------------------------------------
@@ -128,11 +108,6 @@ export class DevClawService extends Disposable implements IDevClawService {
 	selectAgent(agentId: string): void {
 		this._selectedAgentId = agentId;
 		this._onAgentSelected.fire(agentId);
-
-		// Notify OpenClaw backend via WebSocket if connected
-		if (this._isConnected && this.openclawClient) {
-			this.openclawClient.selectAgent(agentId);
-		}
 	}
 
 	// ---------------------------------------------------------------------------
@@ -212,11 +187,9 @@ export class DevClawService extends Disposable implements IDevClawService {
 	reconnect(): void {
 		// Dispose the current client cleanly
 		this.client.dispose();
-		this.openclawClient = null;
 		this._isConnected = false;
 
-		// Re-read backend type in case it changed in settings
-		this._backendType = (this.storageService.get('devteam.backend', StorageScope.APPLICATION, 'openclaw') as BackendType) || 'openclaw';
+		this._backendType = 'openclaw';
 		this.client = this.createClient();
 		this.tryConnect();
 	}
@@ -238,11 +211,6 @@ export class DevClawService extends Disposable implements IDevClawService {
 			await this.client.getHealth();
 			this._isConnected = true;
 			this._onConnectionChanged.fire(true);
-
-			// Connect WebSocket only when OpenClaw backend is active
-			if (this.openclawClient) {
-				this.openclawClient.connectWs();
-			}
 		} catch {
 			this._isConnected = false;
 			this._onConnectionChanged.fire(false);
@@ -251,7 +219,6 @@ export class DevClawService extends Disposable implements IDevClawService {
 
 	override dispose(): void {
 		this.client.dispose();
-		this.openclawClient = null;
 		super.dispose();
 	}
 }

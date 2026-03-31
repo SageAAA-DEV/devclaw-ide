@@ -65,16 +65,13 @@ export class DevClawAgent extends Disposable implements IAgent {
 
 	private _getConfig(): DevClawConfig {
 		return {
-			backend: 'openclaw',
 			openclawUrl: `http://127.0.0.1:${process.env['OPENCLAW_PORT'] || '18789'}`,
 			openclawToken: process.env['OPENCLAW_TOKEN'] || '',
 		};
 	}
 
 	private _isConfigured(): boolean {
-		const config = this._getConfig();
-		if (config.backend === 'openclaw') { return true; }
-		return !!config.baseUrl;
+		return true; // OpenClaw is always available (local daemon)
 	}
 
 	// ---- session management --------------------------------------------------
@@ -150,164 +147,59 @@ export class DevClawAgent extends Disposable implements IAgent {
 			const { default: http } = await import('http');
 			const { default: https } = await import('https');
 
-			if (config.backend === 'openclaw') {
-				// --- OpenClaw path (OpenAI-compatible /v1/chat/completions) ---
-				const url = new URL(`${config.openclawUrl}/v1/chat/completions`);
-				const transport = url.protocol === 'https:' ? https : http;
+			// --- OpenClaw path (OpenAI-compatible /v1/chat/completions) ---
+			const url = new URL(`${config.openclawUrl}/v1/chat/completions`);
+			const transport = url.protocol === 'https:' ? https : http;
 
-				const body = JSON.stringify({
-					model: `openclaw:${session.agentId}`,
-					messages: [{ role: 'user', content: fullMessage }],
-					user: session.sessionId,
-				});
+			const body = JSON.stringify({
+				model: `openclaw:${session.agentId}`,
+				messages: [{ role: 'user', content: fullMessage }],
+				user: session.sessionId,
+			});
 
-				const headers: Record<string, string> = {
-					'Content-Type': 'application/json',
-				};
-				if (config.openclawToken) {
-					headers['Authorization'] = `Bearer ${config.openclawToken}`;
-				}
-
-				const response = await new Promise<string>((resolve, reject) => {
-					const req = transport.request(url, { method: 'POST', headers }, (res) => {
-						let data = '';
-						res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
-						res.on('end', () => {
-							if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-								resolve(data);
-							} else {
-								reject(new Error(`OpenClaw API ${res.statusCode}: ${data || res.statusMessage}`));
-							}
-						});
-					});
-					req.on('error', reject);
-					req.write(body);
-					req.end();
-				});
-
-				const data = JSON.parse(response);
-				const content = data.choices?.[0]?.message?.content || 'No response from OpenClaw.';
-
-				this._onDidSessionProgress.fire({
-					session: sessionUri,
-					type: 'delta',
-					messageId: generateUuid(),
-					content,
-				});
-
-				this._logService.info(`[DevClaw:${sessionId}] OpenClaw response via model openclaw:${session.agentId}`);
-			} else {
-				// --- OpenClaw path (POST /api/chat) ---
-				const url = new URL(`${config.baseUrl}/api/chat`);
-				const transport = url.protocol === 'https:' ? https : http;
-
-				const payload: Record<string, string> = {
-					message: fullMessage,
-					agentId: session.agentId,
-				};
-				if (session.conversationId) {
-					payload.conversationId = session.conversationId;
-				}
-				const body = JSON.stringify(payload);
-
-				const headers: Record<string, string> = {
-					'Content-Type': 'application/json',
-				};
-				if (config.appKey) {
-					headers['x-app-key'] = config.appKey;
-				}
-
-				const response = await new Promise<string>((resolve, reject) => {
-					const req = transport.request(url, { method: 'POST', headers }, (res) => {
-						let data = '';
-						res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
-						res.on('end', () => {
-							if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-								resolve(data);
-							} else {
-								// Include response body for better error diagnostics
-								reject(new Error(`OpenClaw API ${res.statusCode}: ${data || res.statusMessage}`));
-							}
-						});
-					});
-					req.on('error', reject);
-					req.write(body);
-					req.end();
-				});
-
-				const data = JSON.parse(response);
-
-				// Persist conversationId for multi-turn conversations
-				if (data.conversationId) {
-					session.conversationId = data.conversationId;
-				}
-
-				// Emit thinking/reasoning if present
-				if (data.thinking) {
-					this._onDidSessionProgress.fire({
-						session: sessionUri,
-						type: 'reasoning',
-						content: data.thinking,
-					});
-				}
-
-				// Emit tool calls as tool_start + tool_complete events
-				if (data.toolCalls && Array.isArray(data.toolCalls)) {
-					for (const tc of data.toolCalls) {
-						const toolCallId = generateUuid();
-						this._onDidSessionProgress.fire({
-							session: sessionUri,
-							type: 'tool_start',
-							toolCallId,
-							toolName: tc.tool,
-							displayName: tc.tool,
-							invocationMessage: `Running \`${tc.tool}\``,
-							toolInput: typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input),
-						});
-						this._onDidSessionProgress.fire({
-							session: sessionUri,
-							type: 'tool_complete',
-							toolCallId,
-							success: true,
-							pastTenseMessage: `Ran \`${tc.tool}\``,
-							toolOutput: typeof tc.result === 'string' ? tc.result.substring(0, 2000) : JSON.stringify(tc.result).substring(0, 2000),
-						});
-					}
-				}
-
-				// Emit the main response content
-				const content = data.response || data.message || 'No response from agent.';
-				this._onDidSessionProgress.fire({
-					session: sessionUri,
-					type: 'delta',
-					messageId: generateUuid(),
-					content,
-				});
-
-				// Emit token usage if available
-				if (data.inputTokens || data.outputTokens) {
-					this._onDidSessionProgress.fire({
-						session: sessionUri,
-						type: 'usage',
-						inputTokens: data.inputTokens,
-						outputTokens: data.outputTokens,
-						model: data.model,
-					});
-				}
-
-				this._logService.info(`[DevClaw:${sessionId}] OpenClaw response from ${data.agentName || data.agentId} (${data.model}), ${data.toolCalls?.length || 0} tool calls`);
+			const headers: Record<string, string> = {
+				'Content-Type': 'application/json',
+			};
+			if (config.openclawToken) {
+				headers['Authorization'] = `Bearer ${config.openclawToken}`;
 			}
+
+			const response = await new Promise<string>((resolve, reject) => {
+				const req = transport.request(url, { method: 'POST', headers }, (res) => {
+					let data = '';
+					res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+					res.on('end', () => {
+						if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+							resolve(data);
+						} else {
+							reject(new Error(`OpenClaw API ${res.statusCode}: ${data || res.statusMessage}`));
+						}
+					});
+				});
+				req.on('error', reject);
+				req.write(body);
+				req.end();
+			});
+
+			const data = JSON.parse(response);
+			const content = data.choices?.[0]?.message?.content || 'No response from OpenClaw.';
+
+			this._onDidSessionProgress.fire({
+				session: sessionUri,
+				type: 'delta',
+				messageId: generateUuid(),
+				content,
+			});
+
+			this._logService.info(`[DevClaw:${sessionId}] OpenClaw response via model openclaw:${session.agentId}`);
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
 			this._logService.error(`[DevClaw:${sessionId}] Error: ${errorMsg}`);
 
-			// Parse structured error from the active backend if available
-			const backendName = config.backend === 'openclaw' ? 'OpenClaw' : 'OpenClaw';
-			const backendUrl = config.backend === 'openclaw' ? config.openclawUrl : config.baseUrl;
 			let displayMsg: string;
 			if (errorMsg.includes('ECONNREFUSED')) {
-				displayMsg = `Cannot reach ${backendName} at ${backendUrl}. Make sure ${backendName} is running.`;
-			} else if (errorMsg.includes('OpenClaw API') || errorMsg.includes('OpenClaw API')) {
+				displayMsg = `Cannot reach OpenClaw at ${config.openclawUrl}. Make sure OpenClaw is running.`;
+			} else if (errorMsg.includes('OpenClaw API')) {
 				// Try to extract the JSON error body
 				try {
 					const jsonStart = errorMsg.indexOf('{');
