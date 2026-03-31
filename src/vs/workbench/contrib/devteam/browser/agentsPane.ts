@@ -1,7 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  DevClaw - Agents Pane
- *  Agent roster view. Shows available agents with status.
- *  Click an agent to start a direct chat.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { ViewPane, IViewPaneOptions } from '../../../browser/parts/views/viewPane.js';
@@ -37,11 +36,8 @@ export class DevClawAgentsPane extends ViewPane {
 	private statusLabel!: HTMLElement;
 
 	private readonly defaultAgents: AgentDisplay[] = [
-		{ id: 'devin', name: 'Devin', role: 'Lead Engineer', status: 'idle', icon: '\u26A1', specialty: 'Architecture, features, big code decisions' },
-		{ id: 'scout', name: 'Scout', role: 'Researcher', status: 'idle', icon: '\uD83D\uDD0D', specialty: 'Code analysis, docs, Stack Overflow deep dives' },
-		{ id: 'sage', name: 'Sage', role: 'Code Reviewer', status: 'idle', icon: '\uD83D\uDEE1', specialty: 'Bugs, security, performance improvements' },
-		{ id: 'ink', name: 'Ink', role: 'Technical Writer', status: 'idle', icon: '\u270F', specialty: 'Docs, comments, PRs, READMEs' },
-		{ id: 'openclaw', name: 'OpenClaw', role: 'Agent Router', status: 'idle', icon: '\uD83C\uDFAF', specialty: 'Routes to the right specialist automatically' },
+		// allow-any-unicode-next-line
+		{ id: 'openclaw', name: 'OpenClaw', role: 'AI Assistant', status: 'idle', icon: '\uD83C\uDFAF', specialty: 'Your AI assistant — powered by your own keys' },
 	];
 
 	constructor(

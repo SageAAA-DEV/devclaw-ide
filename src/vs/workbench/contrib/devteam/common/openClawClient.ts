@@ -10,13 +10,9 @@ export interface OpenClawConfig {
 	token: string;
 }
 
-/** Hardcoded agent roster — OpenClaw has no agent discovery endpoint. */
+/** Default agent — OpenClaw gateway provides a single assistant endpoint. */
 const OPENCLAW_AGENTS: AgentInfo[] = [
-	{ id: 'openclaw', name: 'OpenClaw', role: 'General Assistant', vertical: 'platform', status: 'available', description: 'Core OpenClaw platform agent' },
-	{ id: 'devin', name: 'Devin', role: 'Senior Engineer', vertical: 'dev', status: 'available', description: 'Full-stack development & architecture' },
-	{ id: 'scout', name: 'Scout', role: 'Research Analyst', vertical: 'research', status: 'available', description: 'Market research & competitive analysis' },
-	{ id: 'sage', name: 'Sage', role: 'Business Strategist', vertical: 'strategy', status: 'available', description: 'Business strategy & product decisions' },
-	{ id: 'ink', name: 'Ink', role: 'Content Specialist', vertical: 'content', status: 'available', description: 'Copywriting, docs & creative content' },
+	{ id: 'openclaw', name: 'OpenClaw', role: 'General Assistant', vertical: 'platform', status: 'available', description: 'Your AI assistant powered by OpenClaw' },
 ];
 
 interface OpenAIMessage {

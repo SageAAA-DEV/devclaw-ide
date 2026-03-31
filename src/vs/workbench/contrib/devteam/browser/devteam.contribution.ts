@@ -18,7 +18,7 @@ import './devclawService.js'; // registers the singleton
 import './privacyConsent.js'; // Privacy consent dialog on first launch
 import './settingsImport.js'; // Settings import commands for VS Code, Cursor, Windsurf, Antigravity
 
-// --- Register CTRL-A agents as native chat participants ---
+// --- Register OpenClaw as native chat participant ---
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 import { DevClawAgentRegistration } from './devclawAgents.js';
 

@@ -32,7 +32,7 @@ export interface AgentInfo {
 
 /**
  * Shared interface for IDE ↔ AI backend communication.
- * Both OpenClawClient and CtrlAClient implement this.
+ * OpenClawClient implements this interface.
  */
 export interface IBackendClient {
 	chat(agentId: string, message: string, conversationId?: string): Promise<ChatResponse>;

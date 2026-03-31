@@ -16,8 +16,6 @@ import { IEditorService } from '../../../services/editor/common/editorService.js
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { URI } from '../../../../base/common/uri.js';
 import { VSBuffer } from '../../../../base/common/buffer.js';
-// CtrlAClient available for WebSocket streaming in future
-// import { CtrlAClient } from '../common/ctrlAClient.js';
 import { IDevClawService } from './devclawService.js';
 
 interface DevClawAgentDef {
@@ -29,71 +27,25 @@ interface DevClawAgentDef {
 	isDefault?: boolean;
 }
 
-const DEVCLAW_EXTENSION_ID = new ExtensionIdentifier('sageaaa.devclaw');
+const DEVCLAW_EXTENSION_ID = new ExtensionIdentifier('openclaw.ide');
 
 const AGENT_PERSONAS: Record<string, string> = {
-	'openclaw': 'I route your request to the best specialist on the team. Just tell me what you need \u2014 I\u2019ll pick the right agent automatically.',
-	'devin': 'I\u2019m your lead engineer. I architect systems, build features, and make the big decisions about code structure and patterns.',
-	'scout': 'I\u2019m your researcher. I dig into code, docs, and Stack Overflow. Ask me to investigate anything \u2014 I\u2019ll find the answer.',
-	'sage': 'I catch what you miss. Send me code and I\u2019ll find bugs, security issues, and performance improvements.',
-	'ink': 'I write docs, comments, PR descriptions, and READMEs. Let me make your code understandable to humans.',
+	'openclaw': 'Your AI assistant. Tell me what you need and I will help — code, docs, debugging, architecture, anything.',
 };
 
 const DEVCLAW_AGENTS: DevClawAgentDef[] = [
 	{
-		id: 'devclaw.openclaw',
+		id: 'openclaw.assistant',
 		name: 'openclaw',
 		fullName: 'OpenClaw',
-		description: 'Routes your request to the best specialist agent',
+		description: 'Your AI assistant — powered by your own API keys',
 		isDefault: true,
 		slashCommands: [
 			{ name: 'build', description: 'Build a feature end-to-end' },
 			{ name: 'fix', description: 'Fix a bug or error' },
-			{ name: 'deploy', description: 'Deploy your project' },
-		],
-	},
-	{
-		id: 'devclaw.devin',
-		name: 'devin',
-		fullName: 'Devin — Lead Engineer',
-		description: 'Architect and build features, make big decisions about code structure',
-		slashCommands: [
-			{ name: 'architect', description: 'Design system architecture' },
-			{ name: 'implement', description: 'Build a feature' },
-			{ name: 'refactor', description: 'Refactor code' },
-		],
-	},
-	{
-		id: 'devclaw.scout',
-		name: 'scout',
-		fullName: 'Scout — Researcher',
-		description: 'Investigate code, docs, and find answers',
-		slashCommands: [
-			{ name: 'investigate', description: 'Research a problem' },
 			{ name: 'explain', description: 'Explain how code works' },
-			{ name: 'find', description: 'Find relevant code or docs' },
-		],
-	},
-	{
-		id: 'devclaw.sage',
-		name: 'sage',
-		fullName: 'Sage — Code Reviewer',
-		description: 'Review code for bugs, security, and improvements',
-		slashCommands: [
 			{ name: 'review', description: 'Review code for issues' },
-			{ name: 'security', description: 'Security audit' },
-			{ name: 'optimize', description: 'Performance suggestions' },
-		],
-	},
-	{
-		id: 'devclaw.ink',
-		name: 'ink',
-		fullName: 'Ink — Technical Writer',
-		description: 'Write docs, comments, PR descriptions, READMEs',
-		slashCommands: [
 			{ name: 'document', description: 'Write documentation' },
-			{ name: 'readme', description: 'Generate README' },
-			{ name: 'pr', description: 'Write PR description' },
 		],
 	},
 ];
@@ -407,9 +359,9 @@ export class DevClawAgentRegistration extends Disposable {
 				streamedResponse = response.response;
 				data = { response: streamedResponse };
 			} else {
-				// OpenClaw path — direct REST fetch to /api/chat
-				const url = this.storageService.get('devteam.ctrlA.url', StorageScope.APPLICATION, '');
-				const apiKey = this.storageService.get('devteam.ctrlA.apiKey', StorageScope.APPLICATION, '');
+				// OpenClaw path — direct REST fetch
+				const url = this.storageService.get('devteam.openclaw.url', StorageScope.APPLICATION, '');
+				const apiKey = this.storageService.get('devteam.openclaw.apiKey', StorageScope.APPLICATION, '');
 
 				const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 				if (apiKey) {

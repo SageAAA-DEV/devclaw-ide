@@ -1,7 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  DevTeam IDE - Chat Pane
- *  Cascading stream UI rendered in the sidebar activity bar panel.
- *  Dark theme, monospace, terminal-aesthetic.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { ViewPane, IViewPaneOptions } from '../../../browser/parts/views/viewPane.js';
@@ -93,7 +92,7 @@ export class DevTeamChatPane extends ViewPane {
 		container.appendChild(this.streamContainer);
 
 		// Welcome message
-		this.addSystemMessage('Welcome to DevClaw Chat. Connect to CTRL-A to start chatting with your agent team.');
+		this.addSystemMessage('Welcome to OpenClaw IDE. Configure your API key in Settings to start chatting.');
 
 		// Input bar
 		const inputBar = document.createElement('div');

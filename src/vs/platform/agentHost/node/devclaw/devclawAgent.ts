@@ -97,11 +97,7 @@ export class DevClawAgent extends Disposable implements IAgent {
 
 	async listModels(): Promise<IAgentModelInfo[]> {
 		return [
-			{ provider: this.id, id: 'openclaw', name: 'OpenClaw (Router)', maxContextWindow: 128000, supportsVision: false, supportsReasoningEffort: false },
-			{ provider: this.id, id: 'devin', name: 'Devin (Lead Engineer)', maxContextWindow: 128000, supportsVision: false, supportsReasoningEffort: false },
-			{ provider: this.id, id: 'scout', name: 'Scout (Researcher)', maxContextWindow: 128000, supportsVision: false, supportsReasoningEffort: false },
-			{ provider: this.id, id: 'sage', name: 'Sage (Code Reviewer)', maxContextWindow: 128000, supportsVision: false, supportsReasoningEffort: false },
-			{ provider: this.id, id: 'ink', name: 'Ink (Technical Writer)', maxContextWindow: 128000, supportsVision: false, supportsReasoningEffort: false },
+			{ provider: this.id, id: 'openclaw', name: 'OpenClaw', maxContextWindow: 128000, supportsVision: false, supportsReasoningEffort: false },
 		];
 	}
 
