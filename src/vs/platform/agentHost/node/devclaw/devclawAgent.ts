@@ -18,20 +18,14 @@ import {
 } from '../../common/agentService.js';
 
 interface DevClawConfig {
-	backend: 'openclaw' | 'ctrl-a';
-	// OpenClaw
+	// OpenClaw only
 	openclawUrl: string;
 	openclawToken: string;
-	// CTRL-A
-	baseUrl: string;
-	appKey: string;
 }
 
 /**
- * Agent provider backed by OpenClaw (embedded, default) or CTRL-A (cloud) via REST API.
- * Backend is selected via DEVCLAW_BACKEND env var ('openclaw' | 'ctrl-a').
+ * Agent provider backed by OpenClaw (embedded AI gateway).
  * OpenClaw: POST /v1/chat/completions (OpenAI-compatible), Bearer token auth.
- * CTRL-A: POST /api/chat, x-app-key auth, full response with thinking/toolCalls/sources/tokens.
  */
 export class DevClawAgent extends Disposable implements IAgent {
 	readonly id = 'devclaw' as const;
