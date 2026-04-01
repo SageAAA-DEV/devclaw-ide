@@ -5,7 +5,8 @@
 
 import { EditorPane } from '../../../../browser/parts/editor/editorPane.js';
 import { EditorInput } from '../../../../common/editor/editorInput.js';
-import { IEditorOpenContext } from '../../../../common/editor.js';
+import { EditorInputCapabilities, IEditorOpenContext } from '../../../../common/editor.js';
+import { URI } from '../../../../../base/common/uri.js';
 import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
 import { IThemeService } from '../../../../../platform/theme/common/themeService.js';
 import { IStorageService } from '../../../../../platform/storage/common/storage.js';
@@ -45,7 +46,11 @@ export class LogsEditorInput extends EditorInput {
 
 	static readonly ID = 'workbench.input.logsEditor';
 
-	readonly resource = undefined;
+	readonly resource = URI.from({ scheme: 'devclaw-logs', path: 'default' });
+
+	override get capabilities(): EditorInputCapabilities {
+		return EditorInputCapabilities.Readonly | EditorInputCapabilities.Singleton;
+	}
 
 	override get typeId(): string { return LogsEditorInput.ID; }
 

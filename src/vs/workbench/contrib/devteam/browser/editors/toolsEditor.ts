@@ -5,7 +5,8 @@
 
 import { EditorPane } from '../../../../browser/parts/editor/editorPane.js';
 import { EditorInput } from '../../../../common/editor/editorInput.js';
-import { IEditorOpenContext } from '../../../../common/editor.js';
+import { EditorInputCapabilities, IEditorOpenContext } from '../../../../common/editor.js';
+import { URI } from '../../../../../base/common/uri.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
 import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
@@ -174,7 +175,11 @@ export class ToolsEditorInput extends EditorInput {
 
 	static readonly ID = 'workbench.input.toolsEditor';
 
-	readonly resource = undefined;
+	readonly resource = URI.from({ scheme: 'devclaw-tools', path: 'default' });
+
+	override get capabilities(): EditorInputCapabilities {
+		return EditorInputCapabilities.Readonly | EditorInputCapabilities.Singleton;
+	}
 
 	override get typeId(): string {
 		return ToolsEditorInput.ID;

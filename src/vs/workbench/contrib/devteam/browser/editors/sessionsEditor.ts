@@ -28,9 +28,7 @@ export class SessionsEditorInput extends EditorInput {
 		return SessionsEditorInput.ID;
 	}
 
-	override get resource(): URI | undefined {
-		return undefined;
-	}
+	readonly resource = URI.from({ scheme: 'devclaw-sessions', path: 'default' });
 
 	override getName(): string {
 		return 'Sessions';

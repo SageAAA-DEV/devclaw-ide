@@ -5,7 +5,8 @@
 
 import { EditorPane } from '../../../../browser/parts/editor/editorPane.js';
 import { EditorInput } from '../../../../common/editor/editorInput.js';
-import { IEditorOpenContext } from '../../../../common/editor.js';
+import { EditorInputCapabilities, IEditorOpenContext } from '../../../../common/editor.js';
+import { URI } from '../../../../../base/common/uri.js';
 import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
 import { IThemeService } from '../../../../../platform/theme/common/themeService.js';
 import { IStorageService } from '../../../../../platform/storage/common/storage.js';
@@ -59,7 +60,11 @@ export class UsageEditorInput extends EditorInput {
 
 	static readonly ID = 'workbench.input.usageEditor';
 
-	readonly resource = undefined;
+	readonly resource = URI.from({ scheme: 'devclaw-usage', path: 'default' });
+
+	override get capabilities(): EditorInputCapabilities {
+		return EditorInputCapabilities.Readonly | EditorInputCapabilities.Singleton;
+	}
 
 	override get typeId(): string { return UsageEditorInput.ID; }
 

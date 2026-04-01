@@ -5,7 +5,7 @@
 
 import { EditorPane } from '../../../../browser/parts/editor/editorPane.js';
 import { EditorInput } from '../../../../common/editor/editorInput.js';
-import { IEditorOpenContext } from '../../../../common/editor.js';
+import { EditorInputCapabilities, IEditorOpenContext } from '../../../../common/editor.js';
 import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
 import { IThemeService } from '../../../../../platform/theme/common/themeService.js';
 import { IStorageService } from '../../../../../platform/storage/common/storage.js';
@@ -154,8 +154,10 @@ export class ModelsEditorInput extends EditorInput {
 		return ModelsEditorInput.ID;
 	}
 
-	override get resource(): URI | undefined {
-		return undefined;
+	readonly resource = URI.from({ scheme: 'devclaw-models', path: 'default' });
+
+	override get capabilities(): EditorInputCapabilities {
+		return EditorInputCapabilities.Readonly | EditorInputCapabilities.Singleton;
 	}
 
 	override getName(): string {
