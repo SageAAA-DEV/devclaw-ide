@@ -14,9 +14,10 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { Dimension } from '../../../../../base/browser/dom.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
+import { IGatewayRpcService } from '../../browser/gatewayRpcService.js';
 
 // ---------------------------------------------------------------------------
-// Mock data — will be replaced by OpenClaw RPC client
+// Data types
 // ---------------------------------------------------------------------------
 
 interface CronJobRow {
@@ -26,12 +27,6 @@ interface CronJobRow {
 	lastRun: number;
 	enabled: boolean;
 }
-
-const MOCK_CRON_JOBS: CronJobRow[] = [
-	{ jobId: 'daily-summary', schedule: '0 9 * * *', agentId: 'main', lastRun: Date.now() - 86400000, enabled: true },
-	{ jobId: 'weekly-report', schedule: '0 10 * * 1', agentId: 'main', lastRun: Date.now() - 604800000, enabled: true },
-	{ jobId: 'health-check', schedule: '*/30 * * * *', agentId: 'main', lastRun: Date.now() - 1800000, enabled: false },
-];
 
 // ---------------------------------------------------------------------------
 // EditorInput — the "identity" of the tab
@@ -71,6 +66,7 @@ export class CronEditorPane extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IGatewayRpcService private readonly rpcService: IGatewayRpcService,
 	) {
 		super(CronEditorPane.ID, group, telemetryService, themeService, storageService);
 	}
@@ -93,8 +89,56 @@ export class CronEditorPane extends EditorPane {
 		header.textContent = 'Cron Jobs \u2014 OpenClaw Gateway';
 		this.container.appendChild(header);
 
-		// Table
-		this.renderTable(MOCK_CRON_JOBS);
+		// Loading state
+		const loading = document.createElement('div');
+		loading.className = 'gw-loading';
+		loading.textContent = 'Loading...';
+		this.container.appendChild(loading);
+
+		// Kick off live data fetch
+		this._loadLiveData();
+	}
+
+	private _clearContainer(): void {
+		while (this.container.firstChild) {
+			this.container.removeChild(this.container.firstChild);
+		}
+	}
+
+	private _renderChrome(): void {
+		const style = document.createElement('style');
+		style.textContent = CRON_EDITOR_STYLES;
+		this.container.appendChild(style);
+
+		const header = document.createElement('div');
+		header.className = 'gw-cron-header';
+		header.textContent = 'Cron Jobs \u2014 OpenClaw Gateway';
+		this.container.appendChild(header);
+	}
+
+	private async _loadLiveData(): Promise<void> {
+		try {
+			const result = await this.rpcService.call<{ jobs: Array<{ id?: string; jobId?: string; schedule: string; agentId?: string; lastRun?: number; enabled?: boolean }> }>('cron.list', {});
+			const jobs: CronJobRow[] = result.jobs.map(j => ({
+				jobId: j.jobId ?? j.id ?? 'unknown',
+				schedule: j.schedule,
+				agentId: j.agentId ?? 'main',
+				lastRun: j.lastRun ?? Date.now(),
+				enabled: j.enabled ?? true,
+			}));
+
+			this._clearContainer();
+			this._renderChrome();
+			this.renderTable(jobs);
+		} catch {
+			this._clearContainer();
+			this._renderChrome();
+
+			const error = document.createElement('div');
+			error.className = 'gw-error';
+			error.textContent = 'Unable to connect to gateway';
+			this.container.appendChild(error);
+		}
 	}
 
 	override async setInput(
@@ -284,4 +328,12 @@ const CRON_EDITOR_STYLES = `
 		color: #f44336;
 		border: 1px solid #f4433644;
 	}
+
+	.gw-loading, .gw-error {
+		padding: 32px;
+		text-align: center;
+		font-size: 13px;
+	}
+	.gw-loading { color: #808080; }
+	.gw-error { color: #f44336; }
 `;

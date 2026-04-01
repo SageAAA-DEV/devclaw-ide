@@ -17,6 +17,7 @@ import { IFileService } from '../../../../platform/files/common/files.js';
 import { URI } from '../../../../base/common/uri.js';
 import { VSBuffer } from '../../../../base/common/buffer.js';
 import { IDevClawService } from './devclawService.js';
+import { IGatewayRpcService } from './gatewayRpcService.js';
 
 interface DevClawAgentDef {
 	id: string;
@@ -59,6 +60,7 @@ export class DevClawAgentRegistration extends Disposable {
 		@IEditorService private readonly editorService: IEditorService,
 		@IFileService private readonly fileService: IFileService,
 		@IDevClawService private readonly devClawService: IDevClawService,
+		@IGatewayRpcService private readonly gatewayRpc: IGatewayRpcService,
 	) {
 		super();
 		this.registerAllAgents();
@@ -353,10 +355,35 @@ export class DevClawAgentRegistration extends Disposable {
 			let data: { response?: string; message?: string; thinking?: string; toolCalls?: { tool: string; result: string }[] };
 
 			if (backend === 'openclaw') {
-				// OpenClaw path — route through the shared backend client
-				const client = this.devClawService.getClient();
-				const response = await client.chat(agentId, fullMessage);
-				streamedResponse = response.response;
+				// OpenClaw path — route through WebSocket RPC
+				const sessionKey = `agent:main:devclaw`;
+				const idempotencyKey = crypto.randomUUID();
+
+				await this.gatewayRpc.call('chat.send', {
+					sessionKey,
+					idempotencyKey,
+					message: fullMessage,
+				});
+
+				// Poll for response
+				let responseText = '';
+				for (let attempt = 0; attempt < 60; attempt++) {
+					await new Promise(r => setTimeout(r, 500));
+					if (token.isCancellationRequested) { break; }
+					try {
+						const preview = await this.gatewayRpc.call<{
+							previews?: Array<{ items?: Array<{ role: string; text: string }> }>;
+						}>('sessions.preview', { keys: [sessionKey] });
+						const items = preview.previews?.[0]?.items ?? [];
+						const lastAssistant = [...items].reverse().find(i => i.role === 'assistant');
+						if (lastAssistant?.text) {
+							responseText = lastAssistant.text;
+							break;
+						}
+					} catch { /* not ready */ }
+				}
+
+				streamedResponse = responseText || '(No response received)';
 				data = { response: streamedResponse };
 			} else {
 				// OpenClaw path — direct REST fetch

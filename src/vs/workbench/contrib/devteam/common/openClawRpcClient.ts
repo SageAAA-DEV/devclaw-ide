@@ -54,23 +54,55 @@ export class OpenClawRpcClient extends Disposable {
 				}, 10000);
 
 				this.ws.onopen = () => {
-					clearTimeout(timeout);
-					this.sendRaw({
-						method: 'connect',
-						params: {
-							clientId: generateUuid(),
-							role: 'operator',
-							scopes: ['operator.*'],
-							auth: token ? { token } : undefined,
-						},
-					});
-					this._isConnected = true;
-					this._onDidConnect.fire();
-					resolve();
+					// Wait for connect.challenge before sending connect
 				};
 
 				this.ws.onmessage = (event) => {
-					this.handleMessage(event.data as string);
+					const raw = event.data as string;
+					try {
+						const msg = JSON.parse(raw);
+
+						// Handle challenge-response auth flow
+						if (msg.type === 'event' && msg.event === 'connect.challenge') {
+							clearTimeout(timeout);
+							this.sendRaw({
+								type: 'req',
+								id: generateUuid(),
+								method: 'connect',
+								params: {
+									minProtocol: 3,
+									maxProtocol: 3,
+									client: { id: 'openclaw-control-ui', version: '1.0.0', platform: 'win32', mode: 'ui' },
+									role: 'operator',
+									scopes: ['operator.admin'],
+									auth: token ? { token } : {},
+								},
+							});
+							return;
+						}
+
+						// Handle connect response
+						if (msg.id && msg.type === 'res' && msg.method === undefined) {
+							const entry = this.pending.get(msg.id);
+							if (entry) {
+								this.handleMessage(raw);
+								return;
+							}
+							// This is the connect response (not in pending map)
+							if (msg.ok) {
+								this._isConnected = true;
+								this._onDidConnect.fire();
+								resolve();
+							} else {
+								reject(new Error(msg.error?.message ?? 'Connect rejected'));
+							}
+							return;
+						}
+
+						this.handleMessage(raw);
+					} catch {
+						// Ignore malformed messages
+					}
 				};
 
 				this.ws.onclose = () => {
@@ -113,7 +145,7 @@ export class OpenClawRpcClient extends Disposable {
 				timer,
 			});
 
-			this.sendRaw({ id, method, params });
+			this.sendRaw({ type: 'req', id, method, params });
 		});
 	}
 
@@ -139,7 +171,7 @@ export class OpenClawRpcClient extends Disposable {
 				if (msg.ok === false && msg.error) {
 					entry.reject(new Error(`${msg.error.code}: ${msg.error.message}`));
 				} else {
-					entry.resolve(msg.result ?? msg);
+					entry.resolve(msg.payload ?? msg.result ?? msg);
 				}
 			}
 		} catch {

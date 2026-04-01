@@ -18,6 +18,7 @@ import { IStorageService, StorageScope } from '../../../../platform/storage/comm
 import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
 import { IBackendClient, type ChatResponse } from '../common/backendClient.js';
 import { OpenClawClient } from '../common/openClawClient.js';
+import { IGatewayRpcService } from './gatewayRpcService.js';
 
 export type BackendType = 'openclaw';
 
@@ -81,6 +82,7 @@ export class DevClawService extends Disposable implements IDevClawService {
 
 	constructor(
 		@IStorageService private readonly storageService: IStorageService,
+		@IGatewayRpcService private readonly gatewayRpc: IGatewayRpcService,
 	) {
 		super();
 
@@ -118,22 +120,72 @@ export class DevClawService extends Disposable implements IDevClawService {
 		this._onChatMessage.fire({ role: 'user', content: message });
 
 		if (!this._isConnected) {
-			const backendName = this._backendType === 'openclaw' ? 'OpenClaw' : 'OpenClaw';
-			this._onChatMessage.fire({
-				role: 'system',
-				content: `Not connected to ${backendName}. Configure your connection in DevClaw Settings.`,
-			});
-			return null;
+			// Try to reconnect via gateway RPC
+			try {
+				await this.gatewayRpc.ensureConnected();
+				this._isConnected = true;
+				this._onConnectionChanged.fire(true);
+			} catch {
+				this._onChatMessage.fire({
+					role: 'system',
+					content: 'Not connected to OpenClaw. Configure your connection in DevClaw Settings.',
+				});
+				return null;
+			}
 		}
 
 		try {
-			const response = await this.client.chat(this._selectedAgentId, message);
+			const agentId = this._selectedAgentId === 'openclaw' ? 'main' : this._selectedAgentId;
+			const sessionKey = `agent:${agentId}:devclaw`;
+			const idempotencyKey = crypto.randomUUID();
+
+			// Send chat message via WebSocket RPC — async, returns runId
+			const sendResult = await this.gatewayRpc.call<{ runId: string; status: string }>('chat.send', {
+				sessionKey,
+				idempotencyKey,
+				message,
+			});
+
+			// Poll for completion by checking session preview
+			// The gateway fires events but we can't listen to them from this service easily,
+			// so we poll with a short delay
+			let content = '';
+			for (let attempt = 0; attempt < 60; attempt++) {
+				await new Promise(r => setTimeout(r, 500));
+				try {
+					const preview = await this.gatewayRpc.call<{
+						previews?: Array<{
+							key: string;
+							items?: Array<{ role: string; text: string }>;
+						}>;
+					}>('sessions.preview', { keys: [sessionKey] });
+
+					const items = preview.previews?.[0]?.items ?? [];
+					// Find the last assistant message
+					const lastAssistant = [...items].reverse().find(i => i.role === 'assistant');
+					if (lastAssistant?.text) {
+						content = lastAssistant.text;
+						break;
+					}
+				} catch {
+					// Preview not ready yet — keep polling
+				}
+			}
+
+			if (!content) {
+				content = '(No response received — the agent may still be processing)';
+			}
+
 			this._onChatMessage.fire({
 				role: 'assistant',
-				content: response.response,
+				content,
 				agentId: this._selectedAgentId,
 			});
-			return response;
+			return {
+				response: content,
+				agentId: this._selectedAgentId,
+				conversationId: sessionKey,
+			};
 		} catch (err) {
 			this._onChatMessage.fire({
 				role: 'system',
@@ -144,32 +196,13 @@ export class DevClawService extends Disposable implements IDevClawService {
 	}
 
 	async sendMessageStream(message: string, onChunk: (text: string) => void): Promise<string | null> {
-		this._onChatMessage.fire({ role: 'user', content: message });
-
-		if (!this._isConnected) {
-			const backendName = this._backendType === 'openclaw' ? 'OpenClaw' : 'OpenClaw';
-			this._onChatMessage.fire({
-				role: 'system',
-				content: `Not connected to ${backendName}. Configure your connection in DevClaw Settings.`,
-			});
-			return null;
+		// WebSocket RPC doesn't support streaming — fall back to regular send
+		const result = await this.sendMessage(message);
+		if (result) {
+			onChunk(result.response);
+			return result.response;
 		}
-
-		try {
-			const response = await this.client.chatStream(this._selectedAgentId, message, onChunk);
-			this._onChatMessage.fire({
-				role: 'assistant',
-				content: response,
-				agentId: this._selectedAgentId,
-			});
-			return response;
-		} catch (err) {
-			this._onChatMessage.fire({
-				role: 'system',
-				content: `Error: ${err instanceof Error ? err.message : String(err)}`,
-			});
-			return null;
-		}
+		return null;
 	}
 
 	async sendMessageWithContext(message: string, context: string, filePath?: string): Promise<ChatResponse | null> {
@@ -208,13 +241,25 @@ export class DevClawService extends Disposable implements IDevClawService {
 
 	private async tryConnect(): Promise<void> {
 		try {
-			await this.client.getHealth();
+			// Use the shared WebSocket RPC service for health check
+			await this.gatewayRpc.ensureConnected();
+			await this.gatewayRpc.call('health', {});
 			this._isConnected = true;
 			this._onConnectionChanged.fire(true);
 		} catch {
 			this._isConnected = false;
 			this._onConnectionChanged.fire(false);
 		}
+
+		// Also listen for gateway connection state changes
+		this.gatewayRpc.onDidConnect(() => {
+			this._isConnected = true;
+			this._onConnectionChanged.fire(true);
+		});
+		this.gatewayRpc.onDidDisconnect(() => {
+			this._isConnected = false;
+			this._onConnectionChanged.fire(false);
+		});
 	}
 
 	override dispose(): void {

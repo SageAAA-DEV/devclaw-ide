@@ -14,9 +14,10 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { Dimension } from '../../../../../base/browser/dom.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
+import { IGatewayRpcService } from '../../browser/gatewayRpcService.js';
 
 // ---------------------------------------------------------------------------
-// Mock data — will be replaced by OpenClaw RPC client
+// Data types
 // ---------------------------------------------------------------------------
 
 interface NodeRow {
@@ -26,12 +27,6 @@ interface NodeRow {
 	connected: boolean;
 	caps: string[];
 }
-
-const MOCK_NODES: NodeRow[] = [
-	{ nodeId: 'macbook-pro', displayName: 'MacBook Pro', platform: 'macos', connected: true, caps: ['bash', 'docker', 'browser'] },
-	{ nodeId: 'iphone-15', displayName: 'iPhone 15', platform: 'ios', connected: true, caps: ['shortcuts'] },
-	{ nodeId: 'server-1', displayName: 'Dev Server', platform: 'linux', connected: false, caps: ['bash', 'docker', 'gpu'] },
-];
 
 // ---------------------------------------------------------------------------
 // Platform labels for display
@@ -82,6 +77,7 @@ export class NodesEditorPane extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IGatewayRpcService private readonly rpcService: IGatewayRpcService,
 	) {
 		super(NodesEditorPane.ID, group, telemetryService, themeService, storageService);
 	}
@@ -104,8 +100,56 @@ export class NodesEditorPane extends EditorPane {
 		header.textContent = 'Nodes \u2014 Paired Devices';
 		this.container.appendChild(header);
 
-		// Cards
-		this.renderCards(MOCK_NODES);
+		// Loading state
+		const loading = document.createElement('div');
+		loading.className = 'gw-loading';
+		loading.textContent = 'Loading...';
+		this.container.appendChild(loading);
+
+		// Kick off live data fetch
+		this._loadLiveData();
+	}
+
+	private _clearContainer(): void {
+		while (this.container.firstChild) {
+			this.container.removeChild(this.container.firstChild);
+		}
+	}
+
+	private _renderChrome(): void {
+		const style = document.createElement('style');
+		style.textContent = NODES_EDITOR_STYLES;
+		this.container.appendChild(style);
+
+		const header = document.createElement('div');
+		header.className = 'gw-nodes-header';
+		header.textContent = 'Nodes \u2014 Paired Devices';
+		this.container.appendChild(header);
+	}
+
+	private async _loadLiveData(): Promise<void> {
+		try {
+			const result = await this.rpcService.call<{ nodes: Array<{ nodeId: string; displayName?: string; platform?: string; connected: boolean; capabilities?: string[] }> }>('node.list', {});
+			const nodes: NodeRow[] = result.nodes.map(n => ({
+				nodeId: n.nodeId,
+				displayName: n.displayName ?? n.nodeId,
+				platform: (n.platform ?? 'linux') as NodeRow['platform'],
+				connected: n.connected,
+				caps: n.capabilities ?? [],
+			}));
+
+			this._clearContainer();
+			this._renderChrome();
+			this.renderCards(nodes);
+		} catch {
+			this._clearContainer();
+			this._renderChrome();
+
+			const error = document.createElement('div');
+			error.className = 'gw-error';
+			error.textContent = 'Unable to connect to gateway';
+			this.container.appendChild(error);
+		}
 	}
 
 	override async setInput(
@@ -278,4 +322,12 @@ const NODES_EDITOR_STYLES = `
 		background: #ffffff0a;
 		border: 1px solid #ffffff14;
 	}
+
+	.gw-loading, .gw-error {
+		padding: 32px;
+		text-align: center;
+		font-size: 13px;
+	}
+	.gw-loading { color: #808080; }
+	.gw-error { color: #f44336; }
 `;

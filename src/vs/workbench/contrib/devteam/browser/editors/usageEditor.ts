@@ -14,9 +14,10 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { Dimension } from '../../../../../base/browser/dom.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
+import { IGatewayRpcService } from '../../browser/gatewayRpcService.js';
 
 // ---------------------------------------------------------------------------
-// Mock data — will be replaced by OpenClaw RPC client
+// Types
 // ---------------------------------------------------------------------------
 
 interface ProviderUsage {
@@ -37,20 +38,6 @@ interface UsageData {
 	byProvider: ProviderUsage[];
 	daily: DailyUsage[];
 }
-
-const MOCK_USAGE: UsageData = {
-	totalTokens: 1250000,
-	totalCost: 4.82,
-	byProvider: [
-		{ provider: 'Anthropic', tokens: 980000, cost: 3.50 },
-		{ provider: 'OpenAI', tokens: 270000, cost: 1.32 },
-	],
-	daily: [
-		{ date: '2026-03-29', tokens: 450000, messages: 45 },
-		{ date: '2026-03-30', tokens: 380000, messages: 32 },
-		{ date: '2026-03-31', tokens: 420000, messages: 38 },
-	],
-};
 
 // ---------------------------------------------------------------------------
 // EditorInput — the "identity" of the tab
@@ -90,6 +77,7 @@ export class UsageEditorPane extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IGatewayRpcService private readonly rpcService: IGatewayRpcService,
 	) {
 		super(UsageEditorPane.ID, group, telemetryService, themeService, storageService);
 	}
@@ -112,10 +100,14 @@ export class UsageEditorPane extends EditorPane {
 		header.textContent = 'Usage \u2014 OpenClaw Gateway';
 		this.container.appendChild(header);
 
-		// Render all sections
-		this.renderTotals(MOCK_USAGE);
-		this.renderProviderBars(MOCK_USAGE);
-		this.renderDailyTable(MOCK_USAGE);
+		// Loading state
+		const loading = document.createElement('div');
+		loading.className = 'gw-loading';
+		loading.textContent = 'Loading...';
+		this.container.appendChild(loading);
+
+		// Fetch live data
+		this._loadLiveData();
 	}
 
 	override async setInput(
@@ -137,6 +129,97 @@ export class UsageEditorPane extends EditorPane {
 
 	override focus(): void {
 		this.container?.focus();
+	}
+
+	// -- live data -----------------------------------------------------------
+
+	private async _loadLiveData(): Promise<void> {
+		try {
+			// usage.status may fail with AbortError on some gateway instances — handle gracefully
+			let usageResult: { totalTokens?: number; totalCost?: number; providers?: Array<{ provider: string; tokens: number; cost: number }> } | null = null;
+			try {
+				usageResult = await this.rpcService.call<{
+					totalTokens?: number;
+					totalCost?: number;
+					providers?: Array<{ provider: string; tokens: number; cost: number }>;
+				}>('usage.status', {});
+			} catch {
+				// usage.status not available on this gateway
+			}
+
+			let timeseries: Array<{ date: string; tokens: number; messages?: number }> = [];
+			try {
+				const tsResult = await this.rpcService.call<{
+					timeseries?: Array<{ date: string; tokens: number; messages?: number }>;
+				}>('sessions.usage.timeseries', {});
+				timeseries = tsResult.timeseries || [];
+			} catch {
+				// timeseries call failed independently — proceed without it
+			}
+
+			// If neither RPC succeeded, show unavailable message
+			if (!usageResult && timeseries.length === 0) {
+				this._renderUnavailable('Usage data unavailable');
+				return;
+			}
+
+			const liveData: UsageData = {
+				totalTokens: usageResult?.totalTokens ?? 0,
+				totalCost: usageResult?.totalCost ?? 0,
+				byProvider: (usageResult?.providers || []).map(p => ({
+					provider: p.provider,
+					tokens: p.tokens,
+					cost: p.cost,
+				})),
+				daily: timeseries.map(t => ({
+					date: t.date,
+					tokens: t.tokens,
+					messages: t.messages ?? 0,
+				})),
+			};
+
+			// Clear container and re-render with live data
+			while (this.container.firstChild) {
+				this.container.removeChild(this.container.firstChild);
+			}
+
+			const style = document.createElement('style');
+			style.textContent = USAGE_EDITOR_STYLES;
+			this.container.appendChild(style);
+
+			const header = document.createElement('div');
+			header.className = 'gw-usage-header';
+			header.textContent = 'Usage \u2014 OpenClaw Gateway';
+			this.container.appendChild(header);
+
+			this.renderTotals(liveData);
+			this.renderProviderBars(liveData);
+			this.renderDailyTable(liveData);
+		} catch (err) {
+			const isConnectionError = err instanceof Error && (err.message.includes('WebSocket') || err.message.includes('ECONNREFUSED') || err.message.includes('not connected'));
+			this._renderUnavailable(isConnectionError ? 'Unable to connect to gateway' : 'Usage data unavailable');
+		}
+	}
+
+	private _renderUnavailable(message: string): void {
+		// Clear container and show message
+		while (this.container.firstChild) {
+			this.container.removeChild(this.container.firstChild);
+		}
+
+		const style = document.createElement('style');
+		style.textContent = USAGE_EDITOR_STYLES;
+		this.container.appendChild(style);
+
+		const header = document.createElement('div');
+		header.className = 'gw-usage-header';
+		header.textContent = 'Usage \u2014 OpenClaw Gateway';
+		this.container.appendChild(header);
+
+		const error = document.createElement('div');
+		error.className = 'gw-error';
+		error.textContent = message;
+		this.container.appendChild(error);
 	}
 
 	// -- helpers -------------------------------------------------------------
@@ -413,4 +496,12 @@ const USAGE_EDITOR_STYLES = `
 		border-bottom: 1px solid #1a1a2e;
 		color: #e0e0e0;
 	}
+
+	.gw-loading, .gw-error {
+		padding: 32px;
+		text-align: center;
+		font-size: 13px;
+	}
+	.gw-loading { color: #808080; }
+	.gw-error { color: #f44336; }
 `;

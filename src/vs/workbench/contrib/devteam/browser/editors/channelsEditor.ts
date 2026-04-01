@@ -14,9 +14,10 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { Dimension } from '../../../../../base/browser/dom.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
+import { IGatewayRpcService } from '../../browser/gatewayRpcService.js';
 
 // ---------------------------------------------------------------------------
-// Mock data — will be replaced by OpenClaw RPC client
+// Data types
 // ---------------------------------------------------------------------------
 
 interface ChannelRow {
@@ -25,14 +26,6 @@ interface ChannelRow {
 	connected: boolean;
 	lastMessageAt: number | null;
 }
-
-const MOCK_CHANNELS: ChannelRow[] = [
-	{ id: 'whatsapp', label: 'WhatsApp', connected: true, lastMessageAt: Date.now() - 300000 },
-	{ id: 'telegram', label: 'Telegram', connected: true, lastMessageAt: Date.now() - 7200000 },
-	{ id: 'slack', label: 'Slack', connected: false, lastMessageAt: null },
-	{ id: 'discord', label: 'Discord', connected: false, lastMessageAt: null },
-	{ id: 'imessage', label: 'iMessage', connected: true, lastMessageAt: Date.now() - 60000 },
-];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -97,6 +90,7 @@ export class ChannelsEditorPane extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IGatewayRpcService private readonly rpcService: IGatewayRpcService,
 	) {
 		super(ChannelsEditorPane.ID, group, telemetryService, themeService, storageService);
 	}
@@ -119,8 +113,87 @@ export class ChannelsEditorPane extends EditorPane {
 		header.textContent = 'Channels \u2014 Messaging Integrations';
 		this.container.appendChild(header);
 
-		// Cards
-		this.renderCards(MOCK_CHANNELS);
+		// Loading state
+		const loading = document.createElement('div');
+		loading.className = 'gw-loading';
+		loading.textContent = 'Loading...';
+		this.container.appendChild(loading);
+
+		// Kick off live data fetch
+		this._loadLiveData();
+	}
+
+	private _clearContainer(): void {
+		while (this.container.firstChild) {
+			this.container.removeChild(this.container.firstChild);
+		}
+	}
+
+	private _renderChrome(): void {
+		const style = document.createElement('style');
+		style.textContent = CHANNELS_EDITOR_STYLES;
+		this.container.appendChild(style);
+
+		const header = document.createElement('div');
+		header.className = 'gw-channels-header';
+		header.textContent = 'Channels \u2014 Messaging Integrations';
+		this.container.appendChild(header);
+	}
+
+	private async _loadLiveData(): Promise<void> {
+		try {
+			// Gateway returns channels as an object map: { channels: { "id": {...}, ... }, channelLabels: {...}, ... }
+			const result = await this.rpcService.call<{
+				channels: Record<string, unknown> | Array<{ id: string; label?: string; connected: boolean; lastMessageAt?: number | null }>;
+				channelLabels?: Record<string, string>;
+			}>('channels.status', {});
+
+			let channels: ChannelRow[];
+
+			if (Array.isArray(result.channels)) {
+				// Array shape (future-proof)
+				channels = result.channels.map(ch => ({
+					id: ch.id,
+					label: ch.label ?? ch.id,
+					connected: ch.connected,
+					lastMessageAt: ch.lastMessageAt ?? null,
+				}));
+			} else {
+				// Object map shape (actual gateway response)
+				const channelMap = result.channels ?? {};
+				const labels = result.channelLabels ?? {};
+				channels = Object.entries(channelMap).map(([id, value]) => {
+					const ch = value as Record<string, unknown>;
+					return {
+						id,
+						label: labels[id] ?? (typeof ch.label === 'string' ? ch.label : id),
+						connected: typeof ch.connected === 'boolean' ? ch.connected : true,
+						lastMessageAt: typeof ch.lastMessageAt === 'number' ? ch.lastMessageAt : null,
+					};
+				});
+			}
+
+			this._clearContainer();
+			this._renderChrome();
+
+			if (channels.length === 0) {
+				const empty = document.createElement('div');
+				empty.className = 'gw-loading';
+				empty.textContent = 'No channels connected';
+				this.container.appendChild(empty);
+			} else {
+				this.renderCards(channels);
+			}
+		} catch (err) {
+			this._clearContainer();
+			this._renderChrome();
+
+			const error = document.createElement('div');
+			error.className = 'gw-error';
+			const isConnectionError = err instanceof Error && (err.message.includes('WebSocket') || err.message.includes('ECONNREFUSED') || err.message.includes('not connected'));
+			error.textContent = isConnectionError ? 'Unable to connect to gateway' : 'No channel data available';
+			this.container.appendChild(error);
+		}
 	}
 
 	override async setInput(
@@ -271,4 +344,12 @@ const CHANNELS_EDITOR_STYLES = `
 		font-size: 11px;
 		color: #808080;
 	}
+
+	.gw-loading, .gw-error {
+		padding: 32px;
+		text-align: center;
+		font-size: 13px;
+	}
+	.gw-loading { color: #808080; }
+	.gw-error { color: #f44336; }
 `;

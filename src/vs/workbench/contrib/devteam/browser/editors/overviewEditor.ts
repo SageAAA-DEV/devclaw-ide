@@ -14,9 +14,11 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { Dimension } from '../../../../../base/browser/dom.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
+import { IGatewayRpcService } from '../../browser/gatewayRpcService.js';
+import { GatewayHealthResult } from '../../common/gatewayTypes.js';
 
 // ---------------------------------------------------------------------------
-// Mock data — will be replaced by OpenClaw RPC client
+// Types
 // ---------------------------------------------------------------------------
 
 interface OverviewData {
@@ -32,20 +34,6 @@ interface OverviewData {
 	tokensToday: number;
 	messagesToday: number;
 }
-
-const MOCK_OVERVIEW: OverviewData = {
-	status: 'healthy',
-	version: 'v2026.3.2',
-	uptime: '4h 32m',
-	activeAgents: 2,
-	activeSessions: 3,
-	connectedChannels: 3,
-	pairedNodes: 2,
-	skillsLoaded: 12,
-	toolsAvailable: 24,
-	tokensToday: 420000,
-	messagesToday: 38,
-};
 
 interface StatCard {
 	label: string;
@@ -91,6 +79,7 @@ export class OverviewEditorPane extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IGatewayRpcService private readonly rpcService: IGatewayRpcService,
 	) {
 		super(OverviewEditorPane.ID, group, telemetryService, themeService, storageService);
 	}
@@ -113,11 +102,14 @@ export class OverviewEditorPane extends EditorPane {
 		header.textContent = 'Overview \u2014 OpenClaw Gateway';
 		this.container.appendChild(header);
 
-		// Status bar
-		this.renderStatusBar(MOCK_OVERVIEW);
+		// Loading state
+		const loading = document.createElement('div');
+		loading.className = 'gw-loading';
+		loading.textContent = 'Loading...';
+		this.container.appendChild(loading);
 
-		// Stat cards grid
-		this.renderGrid(MOCK_OVERVIEW);
+		// Fetch live data
+		this._loadLiveData();
 	}
 
 	override async setInput(
@@ -139,6 +131,90 @@ export class OverviewEditorPane extends EditorPane {
 
 	override focus(): void {
 		this.container?.focus();
+	}
+
+	// -- live data -----------------------------------------------------------
+
+	private async _loadLiveData(): Promise<void> {
+		try {
+			// Actual health payload: { ok, ts, channels: {}, channelOrder: [], heartbeatSeconds,
+			//   defaultAgentId, agents: [{ agentId, isDefault, sessions: { count, recent } }],
+			//   sessions: { count, recent } }
+			const health = await this.rpcService.call<GatewayHealthResult>('health', {});
+			const healthPayload = health as Record<string, unknown>;
+
+			// Best-effort status call — may not exist on all gateways
+			let status: Record<string, unknown> = {};
+			try {
+				status = await this.rpcService.call<Record<string, unknown>>('status', {});
+			} catch { /* status endpoint not available */ }
+
+			// Format uptime from seconds to "Xh Ym"
+			let uptimeStr = '0h 0m';
+			if (health.uptime !== undefined && health.uptime > 0) {
+				const hours = Math.floor(health.uptime / 3600);
+				const minutes = Math.floor((health.uptime % 3600) / 60);
+				uptimeStr = `${hours}h ${minutes}m`;
+			}
+
+			// Extract agents array — health response uses { agentId } (not { id })
+			const agentsList = Array.isArray(healthPayload.agents) ? healthPayload.agents : [];
+			// Extract sessions — { count, recent }
+			const sessionsObj = healthPayload.sessions as { count?: number } | undefined;
+			// Extract channels — object map, count = number of keys
+			const channelsObj = healthPayload.channels as Record<string, unknown> | undefined;
+
+			const liveData: OverviewData = {
+				status: health.ok ? 'healthy' : 'down',
+				version: health.version ?? (typeof status.version === 'string' ? status.version : 'unknown'),
+				uptime: uptimeStr,
+				activeAgents: agentsList.length || (typeof status.agents === 'number' ? status.agents : 0),
+				activeSessions: sessionsObj?.count ?? (typeof status.sessions === 'number' ? status.sessions : 0),
+				connectedChannels: channelsObj ? Object.keys(channelsObj).length : 0,
+				pairedNodes: typeof status.nodes === 'number' ? status.nodes : 0,
+				skillsLoaded: typeof status.skills === 'number' ? status.skills : 0,
+				toolsAvailable: typeof status.tools === 'number' ? status.tools : 0,
+				tokensToday: typeof status.tokensToday === 'number' ? status.tokensToday : 0,
+				messagesToday: typeof status.messagesToday === 'number' ? status.messagesToday : 0,
+			};
+
+			// Clear container and re-render with live data
+			while (this.container.firstChild) {
+				this.container.removeChild(this.container.firstChild);
+			}
+
+			const style = document.createElement('style');
+			style.textContent = OVERVIEW_EDITOR_STYLES;
+			this.container.appendChild(style);
+
+			const header = document.createElement('div');
+			header.className = 'gw-overview-header';
+			header.textContent = 'Overview \u2014 OpenClaw Gateway';
+			this.container.appendChild(header);
+
+			this.renderStatusBar(liveData);
+			this.renderGrid(liveData);
+		} catch (err) {
+			// Clear container and show error
+			while (this.container.firstChild) {
+				this.container.removeChild(this.container.firstChild);
+			}
+
+			const style = document.createElement('style');
+			style.textContent = OVERVIEW_EDITOR_STYLES;
+			this.container.appendChild(style);
+
+			const header = document.createElement('div');
+			header.className = 'gw-overview-header';
+			header.textContent = 'Overview \u2014 OpenClaw Gateway';
+			this.container.appendChild(header);
+
+			const error = document.createElement('div');
+			error.className = 'gw-error';
+			const isConnectionError = err instanceof Error && (err.message.includes('WebSocket') || err.message.includes('ECONNREFUSED') || err.message.includes('not connected'));
+			error.textContent = isConnectionError ? 'Unable to connect to gateway' : 'Gateway health data unavailable';
+			this.container.appendChild(error);
+		}
 	}
 
 	// -- rendering -----------------------------------------------------------
@@ -320,4 +396,12 @@ const OVERVIEW_EDITOR_STYLES = `
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 	}
+
+	.gw-loading, .gw-error {
+		padding: 32px;
+		text-align: center;
+		font-size: 13px;
+	}
+	.gw-loading { color: #808080; }
+	.gw-error { color: #f44336; }
 `;

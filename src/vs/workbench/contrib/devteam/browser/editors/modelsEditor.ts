@@ -14,6 +14,8 @@ import { Dimension } from '../../../../../base/browser/dom.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
 import { URI } from '../../../../../base/common/uri.js';
+import { IGatewayRpcService } from '../../browser/gatewayRpcService.js';
+import { GatewayModelsListResult } from '../../common/gatewayTypes.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -25,18 +27,6 @@ interface IModelEntry {
 	provider: string;
 	isDefault: boolean;
 }
-
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
-
-const MOCK_MODELS: IModelEntry[] = [
-	{ id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'Anthropic', isDefault: true },
-	{ id: 'claude-haiku-3-5', name: 'Claude Haiku 3.5', provider: 'Anthropic', isDefault: false },
-	{ id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', isDefault: false },
-	{ id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI', isDefault: false },
-	{ id: 'MiniMax-M2.5', name: 'MiniMax M2.5', provider: 'MiniMax', isDefault: false },
-];
 
 // ---------------------------------------------------------------------------
 // Inline styles
@@ -140,6 +130,14 @@ const STYLES = `
 	color: #666;
 	font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 }
+
+.gw-loading, .gw-error {
+	padding: 32px;
+	text-align: center;
+	font-size: 13px;
+}
+.gw-loading { color: #808080; }
+.gw-error { color: #f44336; }
 `;
 
 // ---------------------------------------------------------------------------
@@ -184,6 +182,7 @@ export class ModelsEditorPane extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IGatewayRpcService private readonly rpcService: IGatewayRpcService,
 	) {
 		super(ModelsEditorPane.ID, group, telemetryService, themeService, storageService);
 	}
@@ -200,7 +199,26 @@ export class ModelsEditorPane extends EditorPane {
 		style.textContent = STYLES;
 		this._root.appendChild(style);
 
-		this._renderContent();
+		// Header
+		const header = document.createElement('div');
+		header.classList.add('gw-models-header');
+		const title = document.createElement('h1');
+		title.classList.add('gw-models-title');
+		title.textContent = 'Models';
+		const subtitle = document.createElement('p');
+		subtitle.classList.add('gw-models-subtitle');
+		subtitle.textContent = 'Available LLM models organized by provider. Click a model to set it as the default.';
+		header.appendChild(title);
+		header.appendChild(subtitle);
+		this._root.appendChild(header);
+
+		// Loading indicator
+		const loading = document.createElement('div');
+		loading.className = 'gw-loading';
+		loading.textContent = 'Loading...';
+		this._root.appendChild(loading);
+
+		this._loadLiveData();
 	}
 
 	override async setInput(
@@ -219,9 +237,68 @@ export class ModelsEditorPane extends EditorPane {
 		}
 	}
 
+	// --- live data -----------------------------------------------------------
+
+	private async _loadLiveData(): Promise<void> {
+		try {
+			const result = await this.rpcService.call<GatewayModelsListResult>('models.list', {});
+			const models: IModelEntry[] = result.models.map(m => ({
+				id: m.id,
+				name: m.name || m.id,
+				provider: m.provider || 'Unknown',
+				isDefault: m.isDefault ?? false,
+			}));
+
+			if (!this._root) {
+				return;
+			}
+
+			// Clear and re-render with style + header + live data
+			while (this._root.firstChild) {
+				this._root.removeChild(this._root.firstChild);
+			}
+
+			const style = document.createElement('style');
+			style.textContent = STYLES;
+			this._root.appendChild(style);
+
+			this._renderContent(models);
+		} catch {
+			if (!this._root) {
+				return;
+			}
+			while (this._root.firstChild) {
+				this._root.removeChild(this._root.firstChild);
+			}
+
+			const style = document.createElement('style');
+			style.textContent = STYLES;
+			this._root.appendChild(style);
+
+			// Header
+			const header = document.createElement('div');
+			header.classList.add('gw-models-header');
+			const title = document.createElement('h1');
+			title.classList.add('gw-models-title');
+			title.textContent = 'Models';
+			const subtitle = document.createElement('p');
+			subtitle.classList.add('gw-models-subtitle');
+			subtitle.textContent = 'Available LLM models organized by provider. Click a model to set it as the default.';
+			header.appendChild(title);
+			header.appendChild(subtitle);
+			this._root.appendChild(header);
+
+			// Error
+			const error = document.createElement('div');
+			error.className = 'gw-error';
+			error.textContent = 'Unable to connect to gateway';
+			this._root.appendChild(error);
+		}
+	}
+
 	// --- rendering -----------------------------------------------------------
 
-	private _renderContent(): void {
+	private _renderContent(models: IModelEntry[]): void {
 		if (!this._root) {
 			return;
 		}
@@ -243,7 +320,7 @@ export class ModelsEditorPane extends EditorPane {
 		this._root.appendChild(header);
 
 		// Group models by provider
-		const grouped = this._groupByProvider(MOCK_MODELS);
+		const grouped = this._groupByProvider(models);
 
 		for (const [provider, models] of grouped) {
 			const section = document.createElement('div');

@@ -14,9 +14,10 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { Dimension } from '../../../../../base/browser/dom.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
+import { IGatewayRpcService } from '../../browser/gatewayRpcService.js';
 
 // ---------------------------------------------------------------------------
-// Mock data — will be replaced by OpenClaw RPC client
+// Types
 // ---------------------------------------------------------------------------
 
 interface LogEntry {
@@ -24,19 +25,6 @@ interface LogEntry {
 	level: 'INFO' | 'DEBUG' | 'WARN' | 'ERROR';
 	message: string;
 }
-
-const MOCK_LOG_ENTRIES: LogEntry[] = [
-	{ timestamp: '2026-04-01 09:00:01', level: 'INFO', message: 'Gateway started on port 18789' },
-	{ timestamp: '2026-04-01 09:00:02', level: 'INFO', message: "Agent 'main' loaded (claude-sonnet-4)" },
-	{ timestamp: '2026-04-01 09:00:03', level: 'INFO', message: 'Skills loaded: 12 active, 3 disabled' },
-	{ timestamp: '2026-04-01 09:00:05', level: 'INFO', message: 'WhatsApp connected (account: default)' },
-	{ timestamp: '2026-04-01 09:00:05', level: 'INFO', message: 'Telegram connected (account: default)' },
-	{ timestamp: '2026-04-01 09:01:15', level: 'INFO', message: 'Chat: main session started' },
-	{ timestamp: '2026-04-01 09:01:18', level: 'DEBUG', message: 'Tool call: web_search("latest news")' },
-	{ timestamp: '2026-04-01 09:01:22', level: 'INFO', message: 'Chat: response sent (1.2k tokens)' },
-	{ timestamp: '2026-04-01 09:05:00', level: 'WARN', message: 'Rate limit approaching (80%)' },
-	{ timestamp: '2026-04-01 09:10:00', level: 'INFO', message: 'Heartbeat: all systems normal' },
-];
 
 // ---------------------------------------------------------------------------
 // EditorInput — the "identity" of the tab
@@ -76,6 +64,7 @@ export class LogsEditorPane extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IGatewayRpcService private readonly rpcService: IGatewayRpcService,
 	) {
 		super(LogsEditorPane.ID, group, telemetryService, themeService, storageService);
 	}
@@ -98,8 +87,14 @@ export class LogsEditorPane extends EditorPane {
 		header.textContent = 'Logs \u2014 OpenClaw Gateway';
 		this.container.appendChild(header);
 
-		// Log output
-		this.renderLogOutput(MOCK_LOG_ENTRIES);
+		// Loading state
+		const loading = document.createElement('div');
+		loading.className = 'gw-loading';
+		loading.textContent = 'Loading...';
+		this.container.appendChild(loading);
+
+		// Fetch live data
+		this._loadLiveData();
 	}
 
 	override async setInput(
@@ -121,6 +116,79 @@ export class LogsEditorPane extends EditorPane {
 
 	override focus(): void {
 		this.container?.focus();
+	}
+
+	// -- live data -----------------------------------------------------------
+
+	private async _loadLiveData(): Promise<void> {
+		try {
+			// Gateway rejects unexpected params — call with empty object
+			const result = await this.rpcService.call<{
+				entries?: Array<{ timestamp?: string; level?: string; message?: string }>;
+				lines?: Array<string>;
+			}>('logs.tail', {});
+
+			// Handle both structured entries and plain string lines
+			let liveEntries: LogEntry[];
+			if (result.entries && Array.isArray(result.entries)) {
+				liveEntries = result.entries.map(e => ({
+					timestamp: e.timestamp ?? new Date().toISOString(),
+					level: (e.level?.toUpperCase() as LogEntry['level']) || 'INFO',
+					message: e.message ?? '',
+				}));
+			} else if (result.lines && Array.isArray(result.lines)) {
+				liveEntries = result.lines.map(line => ({
+					timestamp: new Date().toISOString(),
+					level: 'INFO' as const,
+					message: typeof line === 'string' ? line : String(line),
+				}));
+			} else {
+				liveEntries = [];
+			}
+
+			// Clear container and re-render with live data
+			while (this.container.firstChild) {
+				this.container.removeChild(this.container.firstChild);
+			}
+
+			const style = document.createElement('style');
+			style.textContent = LOGS_EDITOR_STYLES;
+			this.container.appendChild(style);
+
+			const header = document.createElement('div');
+			header.className = 'gw-logs-header';
+			header.textContent = 'Logs \u2014 OpenClaw Gateway';
+			this.container.appendChild(header);
+
+			if (liveEntries.length === 0) {
+				const empty = document.createElement('div');
+				empty.className = 'gw-loading';
+				empty.textContent = 'No log entries available';
+				this.container.appendChild(empty);
+			} else {
+				this.renderLogOutput(liveEntries);
+			}
+		} catch (err) {
+			// Clear container and show error
+			while (this.container.firstChild) {
+				this.container.removeChild(this.container.firstChild);
+			}
+
+			const style = document.createElement('style');
+			style.textContent = LOGS_EDITOR_STYLES;
+			this.container.appendChild(style);
+
+			const header = document.createElement('div');
+			header.className = 'gw-logs-header';
+			header.textContent = 'Logs \u2014 OpenClaw Gateway';
+			this.container.appendChild(header);
+
+			const error = document.createElement('div');
+			error.className = 'gw-error';
+			const isConnectionError = err instanceof Error && (err.message.includes('WebSocket') || err.message.includes('ECONNREFUSED') || err.message.includes('not connected'));
+			error.textContent = isConnectionError ? 'Unable to connect to gateway' : 'Log data unavailable';
+			this.container.appendChild(error);
+		}
 	}
 
 	// -- rendering -----------------------------------------------------------
@@ -226,4 +294,12 @@ const LOGS_EDITOR_STYLES = `
 	.gw-logs-message {
 		color: #c0c0c0;
 	}
+
+	.gw-loading, .gw-error {
+		padding: 32px;
+		text-align: center;
+		font-size: 13px;
+	}
+	.gw-loading { color: #808080; }
+	.gw-error { color: #f44336; }
 `;

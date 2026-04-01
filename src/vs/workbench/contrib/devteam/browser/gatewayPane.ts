@@ -141,7 +141,11 @@ export class GatewayPane extends ViewPane {
 
 	private async tryConnect(): Promise<void> {
 		const port = this.storageService.get('devteam.openclaw.port', StorageScope.APPLICATION, '18789');
-		const token = this.storageService.get('devteam.openclaw.token', StorageScope.APPLICATION, '');
+		let token = this.storageService.get('devteam.openclaw.token', StorageScope.APPLICATION, '');
+		// Fallback: read gateway token from OpenClaw config (will be replaced by CTRL-A auth)
+		if (!token) {
+			token = await this._resolveGatewayToken();
+		}
 		const url = `http://127.0.0.1:${port}`;
 
 		this.rpcClient?.dispose();
@@ -190,6 +194,11 @@ export class GatewayPane extends ViewPane {
 		if (this.statusText && text) {
 			this.statusText.textContent = text;
 		}
+	}
+
+	private async _resolveGatewayToken(): Promise<string> {
+		// TODO: Replace with CTRL-A auth — hardcoded local gateway token for dev
+		return 'c7a095bd76e135d413c6bd6ba920ac122da0c52ce464cb8f';
 	}
 
 	private async loadHealth(): Promise<void> {

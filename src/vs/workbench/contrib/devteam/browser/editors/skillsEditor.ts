@@ -14,9 +14,10 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { Dimension } from '../../../../../base/browser/dom.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
+import { IGatewayRpcService } from '../../browser/gatewayRpcService.js';
 
 // ---------------------------------------------------------------------------
-// Mock skill data — will be replaced with live gateway fetch
+// Types
 // ---------------------------------------------------------------------------
 interface ISkillEntry {
 	name: string;
@@ -24,13 +25,6 @@ interface ISkillEntry {
 	enabled: boolean;
 	primaryEnv: string;
 }
-
-const MOCK_SKILLS: ISkillEntry[] = [
-	{ name: 'web-search', emoji: '🔍', enabled: true, primaryEnv: 'node' },
-	{ name: 'image-gen', emoji: '🎨', enabled: true, primaryEnv: 'node' },
-	{ name: 'code-exec', emoji: '⚡', enabled: false, primaryEnv: 'docker' },
-	{ name: 'memory', emoji: '🧠', enabled: true, primaryEnv: 'node' },
-];
 
 // ---------------------------------------------------------------------------
 // SkillsEditorInput
@@ -72,6 +66,7 @@ export class SkillsEditorPane extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IGatewayRpcService private readonly rpcService: IGatewayRpcService,
 	) {
 		super(SkillsEditorPane.ID, group, telemetryService, themeService, storageService);
 	}
@@ -82,7 +77,31 @@ export class SkillsEditorPane extends EditorPane {
 		this._root = parent;
 		this._root.classList.add('gw-skills-root');
 		this._injectStyles();
-		this._renderContent();
+
+		// Header
+		const header = document.createElement('div');
+		header.className = 'gw-skills-header';
+
+		const title = document.createElement('h2');
+		title.className = 'gw-skills-title';
+		title.textContent = 'Skills';
+		header.appendChild(title);
+
+		const subtitle = document.createElement('p');
+		subtitle.className = 'gw-skills-subtitle';
+		subtitle.textContent = 'Manage agent skills available through the OpenClaw gateway.';
+		header.appendChild(subtitle);
+
+		this._root.appendChild(header);
+
+		// Loading indicator
+		const loading = document.createElement('div');
+		loading.className = 'gw-loading';
+		loading.textContent = 'Loading...';
+		this._root.appendChild(loading);
+
+		// Attempt to load live data
+		this._loadLiveData();
 	}
 
 	override async setInput(
@@ -103,7 +122,7 @@ export class SkillsEditorPane extends EditorPane {
 
 	// -- rendering -----------------------------------------------------------
 
-	private _renderContent(): void {
+	private _renderContent(skills: ISkillEntry[]): void {
 		// Clear existing content safely
 		while (this._root.firstChild) {
 			this._root.removeChild(this._root.firstChild);
@@ -129,11 +148,59 @@ export class SkillsEditorPane extends EditorPane {
 		const grid = document.createElement('div');
 		grid.className = 'gw-skills-grid';
 
-		for (const skill of MOCK_SKILLS) {
+		for (const skill of skills) {
 			grid.appendChild(this._createCard(skill));
 		}
 
 		this._root.appendChild(grid);
+	}
+
+	private async _loadLiveData(): Promise<void> {
+		try {
+			// Gateway returns skills at top level: { skills: [{ name, emoji, source, bundled, ... }] }
+			const result = await this.rpcService.call<{
+				skills?: Array<{ name: string; emoji?: string; source?: string; bundled?: boolean; enabled?: boolean; primaryEnv?: string }>;
+				workspace?: { skills?: Array<{ name: string; emoji?: string; enabled?: boolean; primaryEnv?: string }> };
+			}>('skills.status', { agentId: 'main' });
+
+			// Handle both top-level and nested response shapes
+			const rawSkills = result.skills ?? result.workspace?.skills ?? [];
+			const skills: ISkillEntry[] = rawSkills.map(s => ({
+				name: s.name,
+				emoji: s.emoji ?? '\u26A1',
+				enabled: s.enabled ?? !(typeof (s as Record<string, unknown>).bundled === 'boolean' && (s as Record<string, unknown>).bundled === false),
+				primaryEnv: s.primaryEnv ?? (s as Record<string, unknown>).source as string ?? 'node',
+			}));
+
+			// Re-render with live data
+			this._renderContent(skills);
+		} catch (err) {
+			// Clear and show error
+			while (this._root.firstChild) {
+				this._root.removeChild(this._root.firstChild);
+			}
+
+			const header = document.createElement('div');
+			header.className = 'gw-skills-header';
+
+			const title = document.createElement('h2');
+			title.className = 'gw-skills-title';
+			title.textContent = 'Skills';
+			header.appendChild(title);
+
+			const subtitle = document.createElement('p');
+			subtitle.className = 'gw-skills-subtitle';
+			subtitle.textContent = 'Manage agent skills available through the OpenClaw gateway.';
+			header.appendChild(subtitle);
+
+			this._root.appendChild(header);
+
+			const error = document.createElement('div');
+			error.className = 'gw-error';
+			const isConnectionError = err instanceof Error && (err.message.includes('WebSocket') || err.message.includes('ECONNREFUSED') || err.message.includes('not connected'));
+			error.textContent = isConnectionError ? 'Unable to connect to gateway' : 'No skills data available';
+			this._root.appendChild(error);
+		}
 	}
 
 	private _createCard(skill: ISkillEntry): HTMLElement {
@@ -313,7 +380,15 @@ export class SkillsEditorPane extends EditorPane {
 				text-transform: uppercase;
 				letter-spacing: 0.5px;
 			}
+
+			.gw-loading, .gw-error {
+				padding: 32px;
+				text-align: center;
+				font-size: 13px;
+			}
+			.gw-loading { color: #808080; }
+			.gw-error { color: #f44336; }
 		`;
-		document.head.appendChild(style);
+		this._root.ownerDocument.head.appendChild(style);
 	}
 }

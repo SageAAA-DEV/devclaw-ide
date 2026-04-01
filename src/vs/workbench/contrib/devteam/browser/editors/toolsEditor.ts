@@ -14,8 +14,10 @@ import { IThemeService } from '../../../../../platform/theme/common/themeService
 import { IStorageService } from '../../../../../platform/storage/common/storage.js';
 import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { Dimension } from '../../../../../base/browser/dom.js';
+import { IGatewayRpcService } from '../../browser/gatewayRpcService.js';
+import { GatewayToolsCatalogResult } from '../../common/gatewayTypes.js';
 
-// --- Mock Data ---
+// --- Types ---
 
 interface ITool {
 	name: string;
@@ -26,28 +28,6 @@ interface IToolGroup {
 	name: string;
 	tools: ITool[];
 }
-
-const MOCK_TOOL_GROUPS: IToolGroup[] = [
-	{
-		name: 'Core', tools: [
-			{ name: 'bash', description: 'Execute shell commands' },
-			{ name: 'read_file', description: 'Read file contents' },
-			{ name: 'write_file', description: 'Write to a file' },
-		]
-	},
-	{
-		name: 'Web', tools: [
-			{ name: 'web_search', description: 'Search the web' },
-			{ name: 'web_fetch', description: 'Fetch a URL' },
-		]
-	},
-	{
-		name: 'Memory', tools: [
-			{ name: 'memory_save', description: 'Save to long-term memory' },
-			{ name: 'memory_search', description: 'Search memory' },
-		]
-	},
-];
 
 // --- Styles ---
 
@@ -167,6 +147,14 @@ const TOOLS_EDITOR_STYLES = `
 	font-size: 12px;
 	color: #999;
 }
+
+.gw-loading, .gw-error {
+	padding: 32px;
+	text-align: center;
+	font-size: 13px;
+}
+.gw-loading { color: #808080; }
+.gw-error { color: #f44336; }
 `;
 
 // --- Editor Input ---
@@ -208,6 +196,7 @@ export class ToolsEditorPane extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IGatewayRpcService private readonly rpcService: IGatewayRpcService,
 	) {
 		super(ToolsEditorPane.ID, group, telemetryService, themeService, storageService);
 	}
@@ -224,7 +213,28 @@ export class ToolsEditorPane extends EditorPane {
 		this.container.classList.add('gw-tools-container');
 		parent.appendChild(this.container);
 
-		this.renderContent();
+		// Header
+		const header = document.createElement('div');
+		header.classList.add('gw-tools-header');
+
+		const title = document.createElement('h2');
+		title.textContent = 'Tools';
+		header.appendChild(title);
+
+		const subtitle = document.createElement('p');
+		subtitle.textContent = 'Loading tool catalog...';
+		header.appendChild(subtitle);
+
+		this.container.appendChild(header);
+
+		// Loading indicator
+		const loading = document.createElement('div');
+		loading.className = 'gw-loading';
+		loading.textContent = 'Loading...';
+		this.container.appendChild(loading);
+
+		// Attempt to load live data from the gateway
+		this._loadLiveData();
 	}
 
 	private clearContainer(): void {
@@ -236,7 +246,7 @@ export class ToolsEditorPane extends EditorPane {
 		}
 	}
 
-	private renderContent(): void {
+	private renderContent(groups: IToolGroup[]): void {
 		if (!this.container) {
 			return;
 		}
@@ -252,8 +262,8 @@ export class ToolsEditorPane extends EditorPane {
 		header.appendChild(title);
 
 		const subtitle = document.createElement('p');
-		const totalTools = MOCK_TOOL_GROUPS.reduce((sum, g) => sum + g.tools.length, 0);
-		subtitle.textContent = `${totalTools} tools available across ${MOCK_TOOL_GROUPS.length} groups`;
+		const totalTools = groups.reduce((sum, g) => sum + g.tools.length, 0);
+		subtitle.textContent = `${totalTools} tools available across ${groups.length} groups`;
 		header.appendChild(subtitle);
 
 		this.container.appendChild(header);
@@ -262,11 +272,51 @@ export class ToolsEditorPane extends EditorPane {
 		const groupsContainer = document.createElement('div');
 		groupsContainer.classList.add('gw-tools-groups');
 
-		for (const group of MOCK_TOOL_GROUPS) {
+		for (const group of groups) {
 			groupsContainer.appendChild(this.renderGroup(group));
 		}
 
 		this.container.appendChild(groupsContainer);
+	}
+
+	private async _loadLiveData(): Promise<void> {
+		try {
+			const result = await this.rpcService.call<GatewayToolsCatalogResult>('tools.catalog', { agentId: 'main' });
+			const groups: IToolGroup[] = result.groups.map(g => ({
+				name: g.name,
+				tools: g.tools.map(t => ({
+					name: t.name,
+					description: t.description,
+				})),
+			}));
+
+			// Re-render with live data
+			this.renderContent(groups);
+		} catch {
+			// Clear and show error
+			if (!this.container) {
+				return;
+			}
+			this.clearContainer();
+
+			const header = document.createElement('div');
+			header.classList.add('gw-tools-header');
+
+			const title = document.createElement('h2');
+			title.textContent = 'Tools';
+			header.appendChild(title);
+
+			const subtitle = document.createElement('p');
+			subtitle.textContent = 'Tool catalog unavailable.';
+			header.appendChild(subtitle);
+
+			this.container.appendChild(header);
+
+			const error = document.createElement('div');
+			error.className = 'gw-error';
+			error.textContent = 'Unable to connect to gateway';
+			this.container.appendChild(error);
+		}
 	}
 
 	private renderGroup(group: IToolGroup): HTMLElement {
@@ -337,7 +387,6 @@ export class ToolsEditorPane extends EditorPane {
 		token: CancellationToken,
 	): Promise<void> {
 		await super.setInput(input, options, context, token);
-		this.renderContent();
 	}
 
 	override layout(dimension: Dimension): void {

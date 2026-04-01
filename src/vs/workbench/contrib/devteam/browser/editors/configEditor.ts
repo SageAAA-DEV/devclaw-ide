@@ -14,9 +14,11 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { Dimension } from '../../../../../base/browser/dom.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
+import { IGatewayRpcService } from '../../browser/gatewayRpcService.js';
+import { GatewayConfigResult } from '../../common/gatewayTypes.js';
 
 // ---------------------------------------------------------------------------
-// Mock data — will be replaced by OpenClaw RPC client
+// Types
 // ---------------------------------------------------------------------------
 
 interface ConfigEntry {
@@ -24,16 +26,6 @@ interface ConfigEntry {
 	value: string | number;
 	category: 'Model' | 'Execution' | 'Preferences';
 }
-
-const MOCK_CONFIG: ConfigEntry[] = [
-	{ key: 'model', value: 'claude-sonnet-4-20250514', category: 'Model' },
-	{ key: 'contextTokens', value: 200000, category: 'Model' },
-	{ key: 'workspace', value: '/Users/jimmy/projects', category: 'Execution' },
-	{ key: 'maxConcurrent', value: 3, category: 'Execution' },
-	{ key: 'thinkingDefault', value: 'medium', category: 'Preferences' },
-	{ key: 'verboseDefault', value: 'off', category: 'Preferences' },
-	{ key: 'userTimezone', value: 'America/New_York', category: 'Preferences' },
-];
 
 // ---------------------------------------------------------------------------
 // EditorInput — the "identity" of the tab
@@ -73,6 +65,7 @@ export class ConfigEditorPane extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IGatewayRpcService private readonly rpcService: IGatewayRpcService,
 	) {
 		super(ConfigEditorPane.ID, group, telemetryService, themeService, storageService);
 	}
@@ -95,8 +88,13 @@ export class ConfigEditorPane extends EditorPane {
 		header.textContent = 'Config \u2014 OpenClaw Gateway';
 		this.container.appendChild(header);
 
-		// Grouped sections
-		this.renderSections(MOCK_CONFIG);
+		// Loading indicator
+		const loading = document.createElement('div');
+		loading.className = 'gw-loading';
+		loading.textContent = 'Loading...';
+		this.container.appendChild(loading);
+
+		this._loadLiveData();
 	}
 
 	override async setInput(
@@ -118,6 +116,68 @@ export class ConfigEditorPane extends EditorPane {
 
 	override focus(): void {
 		this.container?.focus();
+	}
+
+	// -- live data -----------------------------------------------------------
+
+	private async _loadLiveData(): Promise<void> {
+		try {
+			const result = await this.rpcService.call<GatewayConfigResult>('config.get', {});
+			const entries: ConfigEntry[] = [];
+			for (const [key, value] of Object.entries(result.config)) {
+				let category: ConfigEntry['category'];
+				switch (typeof value) {
+					case 'string': category = 'Preferences'; break;
+					case 'number': category = 'Execution'; break;
+					default: category = 'Model'; break;
+				}
+				const displayValue = (typeof value === 'object' && value !== null)
+					? JSON.stringify(value, null, 2)
+					: value as string | number;
+				entries.push({ key, value: displayValue, category });
+			}
+
+			if (!this.container) {
+				return;
+			}
+
+			// Clear container and rebuild style + header + sections
+			while (this.container.firstChild) {
+				this.container.removeChild(this.container.firstChild);
+			}
+
+			const style = document.createElement('style');
+			style.textContent = CONFIG_EDITOR_STYLES;
+			this.container.appendChild(style);
+
+			const header = document.createElement('div');
+			header.className = 'gw-config-header';
+			header.textContent = 'Config \u2014 OpenClaw Gateway';
+			this.container.appendChild(header);
+
+			this.renderSections(entries);
+		} catch {
+			if (!this.container) {
+				return;
+			}
+			while (this.container.firstChild) {
+				this.container.removeChild(this.container.firstChild);
+			}
+
+			const style = document.createElement('style');
+			style.textContent = CONFIG_EDITOR_STYLES;
+			this.container.appendChild(style);
+
+			const header = document.createElement('div');
+			header.className = 'gw-config-header';
+			header.textContent = 'Config \u2014 OpenClaw Gateway';
+			this.container.appendChild(header);
+
+			const error = document.createElement('div');
+			error.className = 'gw-error';
+			error.textContent = 'Unable to connect to gateway';
+			this.container.appendChild(error);
+		}
 	}
 
 	// -- rendering -----------------------------------------------------------
@@ -234,4 +294,12 @@ const CONFIG_EDITOR_STYLES = `
 		color: #e0e0e0;
 		font-size: 13px;
 	}
+
+	.gw-loading, .gw-error {
+		padding: 32px;
+		text-align: center;
+		font-size: 13px;
+	}
+	.gw-loading { color: #808080; }
+	.gw-error { color: #f44336; }
 `;

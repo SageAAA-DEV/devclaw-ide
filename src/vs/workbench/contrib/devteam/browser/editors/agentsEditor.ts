@@ -14,9 +14,10 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { Dimension } from '../../../../../base/browser/dom.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
+import { IGatewayRpcService } from '../../browser/gatewayRpcService.js';
 
 // ---------------------------------------------------------------------------
-// Mock data — will be replaced by OpenClaw RPC client
+// Types
 // ---------------------------------------------------------------------------
 
 interface AgentRow {
@@ -25,11 +26,6 @@ interface AgentRow {
 	model: string;
 	status: 'idle' | 'running';
 }
-
-const MOCK_AGENTS: AgentRow[] = [
-	{ agentId: 'main', name: 'Main Agent', model: 'claude-sonnet-4-20250514', status: 'idle' },
-	{ agentId: 'coder', name: 'Coder', model: 'claude-sonnet-4-20250514', status: 'idle' },
-];
 
 // ---------------------------------------------------------------------------
 // EditorInput — the "identity" of the tab
@@ -69,6 +65,7 @@ export class AgentsEditorPane extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IGatewayRpcService private readonly rpcService: IGatewayRpcService,
 	) {
 		super(AgentsEditorPane.ID, group, telemetryService, themeService, storageService);
 	}
@@ -91,8 +88,14 @@ export class AgentsEditorPane extends EditorPane {
 		header.textContent = 'Agents \u2014 OpenClaw Gateway';
 		this.container.appendChild(header);
 
-		// Table
-		this.renderTable(MOCK_AGENTS);
+		// Loading indicator
+		const loading = document.createElement('div');
+		loading.className = 'gw-loading';
+		loading.textContent = 'Loading...';
+		this.container.appendChild(loading);
+
+		// Attempt to load live data from the gateway
+		this._loadLiveData();
 	}
 
 	override async setInput(
@@ -102,7 +105,6 @@ export class AgentsEditorPane extends EditorPane {
 		token: CancellationToken,
 	): Promise<void> {
 		await super.setInput(input, options, context, token);
-		// Future: fetch live agent list from OpenClaw RPC here
 	}
 
 	override layout(dimension: Dimension): void {
@@ -114,6 +116,67 @@ export class AgentsEditorPane extends EditorPane {
 
 	override focus(): void {
 		this.container?.focus();
+	}
+
+	// -- live data -----------------------------------------------------------
+
+	private async _loadLiveData(): Promise<void> {
+		try {
+			// Gateway returns: { defaultId, mainKey, scope, agents: [{ id }] }
+			const result = await this.rpcService.call<{ agents?: Array<{ id?: string; agentId?: string; name?: string; model?: string }> }>('agents.list', {});
+
+			// Best-effort model fetch — gateway may not support models.list
+			let defaultModel = '';
+			try {
+				const models = await this.rpcService.call<{ models?: Array<{ id: string; name?: string; isDefault?: boolean }> }>('models.list', {});
+				const def = models.models?.find(m => m.isDefault) ?? models.models?.[0];
+				defaultModel = def?.name ?? def?.id ?? '';
+			} catch { /* models.list not available — use fallback */ }
+
+			const agentList = result.agents ?? [];
+			const agents: AgentRow[] = agentList.map(a => ({
+				agentId: a.id ?? a.agentId ?? 'unknown',
+				name: a.id ?? a.agentId ?? a.name ?? 'unknown',
+				model: a.model ?? (defaultModel || 'default'),
+				status: 'idle' as const,
+			}));
+
+			// Clear container and re-render with live data
+			while (this.container.firstChild) {
+				this.container.removeChild(this.container.firstChild);
+			}
+
+			const style = document.createElement('style');
+			style.textContent = AGENTS_EDITOR_STYLES;
+			this.container.appendChild(style);
+
+			const header = document.createElement('div');
+			header.className = 'gw-agents-header';
+			header.textContent = 'Agents \u2014 OpenClaw Gateway';
+			this.container.appendChild(header);
+
+			this.renderTable(agents);
+		} catch (err) {
+			// Clear container and show error
+			while (this.container.firstChild) {
+				this.container.removeChild(this.container.firstChild);
+			}
+
+			const style = document.createElement('style');
+			style.textContent = AGENTS_EDITOR_STYLES;
+			this.container.appendChild(style);
+
+			const header = document.createElement('div');
+			header.className = 'gw-agents-header';
+			header.textContent = 'Agents \u2014 OpenClaw Gateway';
+			this.container.appendChild(header);
+
+			const error = document.createElement('div');
+			error.className = 'gw-error';
+			const isConnectionError = err instanceof Error && (err.message.includes('WebSocket') || err.message.includes('ECONNREFUSED') || err.message.includes('not connected'));
+			error.textContent = isConnectionError ? 'Unable to connect to gateway' : 'No agent data available';
+			this.container.appendChild(error);
+		}
 	}
 
 	// -- rendering -----------------------------------------------------------
@@ -249,4 +312,12 @@ const AGENTS_EDITOR_STYLES = `
 		color: #ff9800;
 		border: 1px solid #ff980044;
 	}
+
+	.gw-loading, .gw-error {
+		padding: 32px;
+		text-align: center;
+		font-size: 13px;
+	}
+	.gw-loading { color: #808080; }
+	.gw-error { color: #f44336; }
 `;

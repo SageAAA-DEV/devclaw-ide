@@ -5,7 +5,7 @@
 
 import { EditorPane } from '../../../../browser/parts/editor/editorPane.js';
 import { EditorInput } from '../../../../common/editor/editorInput.js';
-import { EditorInputCapabilities, Verbosity } from '../../../../common/editor.js';
+import { EditorInputCapabilities, Verbosity, IEditorOpenContext } from '../../../../common/editor.js';
 import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
 import { IThemeService } from '../../../../../platform/theme/common/themeService.js';
 import { IStorageService } from '../../../../../platform/storage/common/storage.js';
@@ -13,8 +13,9 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { Dimension } from '../../../../../base/browser/dom.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
-import { IEditorOpenContext } from '../../../../common/editor.js';
 import { URI } from '../../../../../base/common/uri.js';
+import { IGatewayRpcService } from '../../browser/gatewayRpcService.js';
+import { GatewaySessionEntry } from '../../common/gatewayTypes.js';
 
 // ---------------------------------------------------------------------------
 // SessionsEditorInput
@@ -48,7 +49,7 @@ export class SessionsEditorInput extends EditorInput {
 }
 
 // ---------------------------------------------------------------------------
-// Mock Data
+// Types
 // ---------------------------------------------------------------------------
 
 interface SessionEntry {
@@ -58,14 +59,6 @@ interface SessionEntry {
 	totalTokens: number;
 	contextTokens: number;
 	updatedAt: number;
-}
-
-function getMockSessions(): SessionEntry[] {
-	return [
-		{ sessionKey: 'main', agentId: 'main', model: 'claude-sonnet-4', totalTokens: 45000, contextTokens: 200000, updatedAt: Date.now() },
-		{ sessionKey: 'whatsapp:user1', agentId: 'main', model: 'gpt-4o', totalTokens: 12000, contextTokens: 128000, updatedAt: Date.now() - 3600000 },
-		{ sessionKey: 'telegram:dev', agentId: 'coder', model: 'claude-sonnet-4', totalTokens: 89000, contextTokens: 200000, updatedAt: Date.now() - 7200000 },
-	];
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +204,14 @@ const STYLES = `
 	padding: 48px 0;
 	font-size: 14px;
 }
+
+.gw-loading, .gw-error {
+	padding: 32px;
+	text-align: center;
+	font-size: 13px;
+}
+.gw-loading { color: #808080; }
+.gw-error { color: #f44336; }
 `;
 
 let stylesInjected = false;
@@ -240,6 +241,7 @@ export class SessionsEditorPane extends EditorPane {
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
+		@IGatewayRpcService private readonly rpcService: IGatewayRpcService,
 	) {
 		super('sessionsEditor', group, telemetryService, themeService, storageService);
 	}
@@ -251,7 +253,24 @@ export class SessionsEditorPane extends EditorPane {
 		this.container.className = 'gw-sessions-root';
 		parent.appendChild(this.container);
 
-		this.renderContent();
+		const doc = this.container.ownerDocument;
+
+		// Header
+		const header = doc.createElement('div');
+		header.className = 'gw-sessions-header';
+		const title = doc.createElement('div');
+		title.className = 'gw-sessions-title';
+		title.textContent = 'Sessions';
+		header.appendChild(title);
+		this.container.appendChild(header);
+
+		// Loading indicator
+		const loading = doc.createElement('div');
+		loading.className = 'gw-loading';
+		loading.textContent = 'Loading...';
+		this.container.appendChild(loading);
+
+		this._loadLiveData();
 	}
 
 	override async setInput(
@@ -261,7 +280,6 @@ export class SessionsEditorPane extends EditorPane {
 		token: CancellationToken,
 	): Promise<void> {
 		await super.setInput(input, options, context, token);
-		this.renderContent();
 	}
 
 	override layout(dimension: Dimension): void {
@@ -276,15 +294,65 @@ export class SessionsEditorPane extends EditorPane {
 	}
 
 	// -----------------------------------------------------------------------
+	// Live data
+	// -----------------------------------------------------------------------
+
+	private async _loadLiveData(): Promise<void> {
+		try {
+			const result = await this.rpcService.call<{ sessions: GatewaySessionEntry[] }>('sessions.list', {});
+			const sessions: SessionEntry[] = result.sessions.map(s => ({
+				sessionKey: s.sessionKey || s.sessionId,
+				agentId: s.agentId || 'unknown',
+				model: s.model || 'unknown',
+				totalTokens: s.totalTokens || 0,
+				contextTokens: s.contextTokens || 200000,
+				updatedAt: s.updatedAt || Date.now(),
+			}));
+
+			if (!this.container) {
+				return;
+			}
+
+			// Clear and re-render with live data
+			while (this.container.firstChild) {
+				this.container.removeChild(this.container.firstChild);
+			}
+			this.renderContent(sessions);
+		} catch {
+			if (!this.container) {
+				return;
+			}
+			while (this.container.firstChild) {
+				this.container.removeChild(this.container.firstChild);
+			}
+			ensureStyles(this.container.ownerDocument);
+			const doc = this.container.ownerDocument;
+
+			// Header
+			const header = doc.createElement('div');
+			header.className = 'gw-sessions-header';
+			const title = doc.createElement('div');
+			title.className = 'gw-sessions-title';
+			title.textContent = 'Sessions';
+			header.appendChild(title);
+			this.container.appendChild(header);
+
+			// Error
+			const error = doc.createElement('div');
+			error.className = 'gw-error';
+			error.textContent = 'Unable to connect to gateway';
+			this.container.appendChild(error);
+		}
+	}
+
+	// -----------------------------------------------------------------------
 	// Rendering
 	// -----------------------------------------------------------------------
 
-	private renderContent(): void {
+	private renderContent(sessions: SessionEntry[]): void {
 		if (!this.container) {
 			return;
 		}
-
-		const sessions = getMockSessions();
 		const doc = this.container.ownerDocument;
 
 		// Clear existing content safely
