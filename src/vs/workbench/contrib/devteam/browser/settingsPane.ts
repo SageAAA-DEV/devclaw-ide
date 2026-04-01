@@ -42,6 +42,16 @@ export class DevTeamSettingsPane extends ViewPane {
 		// OpenClaw Cloud
 		openclawUrl: 'devteam.openclaw.url',
 		openclawApiKey: 'devteam.openclaw.apiKey',
+		// Git Integration
+		gitAutoCommit: 'devteam.git.autoCommit',
+		gitAutoPush: 'devteam.git.autoPush',
+		gitRemoteUrl: 'devteam.git.remoteUrl',
+		gitBranch: 'devteam.git.branch',
+		// Database
+		dbType: 'devteam.db.type',
+		dbConnectionString: 'devteam.db.connectionString',
+		// MCP Servers
+		mcpServers: 'devteam.mcp.servers',
 		// Legacy (kept for migration compat)
 		openclawMode: 'devteam.openclaw.mode',
 		openclawCloudUrl: 'devteam.openclaw.cloudUrl',
@@ -125,19 +135,25 @@ export class DevTeamSettingsPane extends ViewPane {
 		// Apply initial visibility
 		this.applyBackendVisibility();
 
-		// --- Section: Git (stub) ---
+		// --- Section: Git Integration ---
 		content.appendChild(this.createSection('Git Integration', [
-			this.createStub('Auto-commit, auto-push, PR creation — coming soon.'),
+			this.createInput('Remote URL', 'gitRemoteUrl', 'https://github.com/user/repo.git', 'text'),
+			this.createInput('Branch', 'gitBranch', 'main', 'text'),
+			this.createToggleRow('Auto-commit', 'gitAutoCommit'),
+			this.createToggleRow('Auto-push', 'gitAutoPush'),
 		]));
 
-		// --- Section: Database (stub) ---
+		// --- Section: Database ---
 		content.appendChild(this.createSection('Database', [
-			this.createStub('Connect any database for agent read/write — coming soon.'),
+			this.createDbTypeDropdown(),
+			this.createInput('Connection String', 'dbConnectionString', 'libsql://your-db.turso.io', 'text'),
+			this.createTestDbButton(),
 		]));
 
-		// --- Section: MCP Servers (stub) ---
+		// --- Section: MCP Servers ---
 		content.appendChild(this.createSection('MCP Servers', [
-			this.createStub('Add custom MCP servers for extended tool access — coming soon.'),
+			this.createMcpServerList(),
+			this.createAddMcpButton(),
 		]));
 
 		container.appendChild(content);
@@ -361,14 +377,17 @@ export class DevTeamSettingsPane extends ViewPane {
 
 		const input = document.createElement('input');
 		input.className = 'devteam-settings-input';
-		input.type = 'text';
-		input.readOnly = true;
+		input.type = 'number';
 		input.spellcheck = false;
+		input.placeholder = '18789';
 
 		const savedPort = this.storageService.get(this.STORAGE_KEYS.openclawPort, StorageScope.APPLICATION, '18789');
 		input.value = savedPort;
-		input.style.opacity = '0.6';
-		input.style.cursor = 'default';
+
+		input.addEventListener('change', () => {
+			const val = input.value.trim() || '18789';
+			this.storageService.store(this.STORAGE_KEYS.openclawPort, val, StorageScope.APPLICATION, StorageTarget.USER);
+		});
 
 		row.appendChild(input);
 		return row;
@@ -478,12 +497,186 @@ export class DevTeamSettingsPane extends ViewPane {
 		return row;
 	}
 
-	private createStub(text: string): HTMLElement {
-		const stub = document.createElement('div');
-		stub.className = 'devteam-settings-stub';
-		stub.textContent = text;
-		return stub;
+	private createToggleRow(label: string, storageKey: keyof typeof this.STORAGE_KEYS): HTMLElement {
+		const row = document.createElement('div');
+		row.className = 'devteam-settings-row devteam-settings-toggle-row';
+
+		const labelEl = document.createElement('label');
+		labelEl.className = 'devteam-settings-label';
+		labelEl.textContent = label;
+
+		const toggle = document.createElement('button');
+		const isOn = this.storageService.get(this.STORAGE_KEYS[storageKey], StorageScope.APPLICATION, 'false') === 'true';
+		toggle.className = `devteam-toggle-pill ${isOn ? 'on' : 'off'}`;
+		toggle.textContent = isOn ? 'ON' : 'OFF';
+
+		toggle.addEventListener('click', () => {
+			const current = this.storageService.get(this.STORAGE_KEYS[storageKey], StorageScope.APPLICATION, 'false') === 'true';
+			const next = !current;
+			this.storageService.store(this.STORAGE_KEYS[storageKey], String(next), StorageScope.APPLICATION, StorageTarget.USER);
+			toggle.className = `devteam-toggle-pill ${next ? 'on' : 'off'}`;
+			toggle.textContent = next ? 'ON' : 'OFF';
+		});
+
+		row.appendChild(labelEl);
+		row.appendChild(toggle);
+		return row;
 	}
+
+	private createDbTypeDropdown(): HTMLElement {
+		const row = document.createElement('div');
+		row.className = 'devteam-settings-row';
+
+		const labelEl = document.createElement('label');
+		labelEl.className = 'devteam-settings-label';
+		labelEl.textContent = 'Database Type';
+		row.appendChild(labelEl);
+
+		const select = document.createElement('select');
+		select.className = 'devteam-settings-select';
+
+		const dbTypes = ['Turso (libSQL)', 'SQLite', 'PostgreSQL', 'MySQL', 'Supabase'];
+		const savedType = this.storageService.get(this.STORAGE_KEYS.dbType, StorageScope.APPLICATION, 'Turso (libSQL)');
+
+		for (const dbType of dbTypes) {
+			const option = document.createElement('option');
+			option.value = dbType;
+			option.textContent = dbType;
+			option.selected = dbType === savedType;
+			select.appendChild(option);
+		}
+
+		select.addEventListener('change', () => {
+			this.storageService.store(this.STORAGE_KEYS.dbType, select.value, StorageScope.APPLICATION, StorageTarget.USER);
+		});
+
+		row.appendChild(select);
+		return row;
+	}
+
+	private createTestDbButton(): HTMLElement {
+		const row = document.createElement('div');
+		row.className = 'devteam-settings-row';
+
+		const btn = document.createElement('button');
+		btn.className = 'devteam-btn devteam-btn-test';
+		btn.textContent = 'Test Connection';
+
+		const status = document.createElement('span');
+		status.className = 'devteam-connection-status';
+
+		btn.addEventListener('click', async () => {
+			btn.disabled = true;
+			btn.textContent = 'Testing...';
+			status.textContent = '';
+
+			const connStr = this.storageService.get(this.STORAGE_KEYS.dbConnectionString, StorageScope.APPLICATION, '');
+			if (!connStr) {
+				status.textContent = 'No connection string configured';
+				status.className = 'devteam-connection-status error';
+				btn.disabled = false;
+				btn.textContent = 'Test Connection';
+				return;
+			}
+
+			// For now, just validate the format
+			try {
+				if (connStr.startsWith('libsql://') || connStr.startsWith('sqlite://') || connStr.startsWith('postgres') || connStr.startsWith('mysql')) {
+					status.textContent = 'Format valid — connection test requires running gateway';
+					status.className = 'devteam-connection-status success';
+				} else {
+					status.textContent = 'Unrecognized connection string format';
+					status.className = 'devteam-connection-status error';
+				}
+			} catch {
+				status.textContent = 'Invalid connection string';
+				status.className = 'devteam-connection-status error';
+			}
+
+			btn.disabled = false;
+			btn.textContent = 'Test Connection';
+		});
+
+		row.appendChild(btn);
+		row.appendChild(status);
+		return row;
+	}
+
+	private createMcpServerList(): HTMLElement {
+		const container = document.createElement('div');
+		container.className = 'devteam-mcp-list';
+
+		const savedServers = this.storageService.get(this.STORAGE_KEYS.mcpServers, StorageScope.APPLICATION, '');
+		let servers: Array<{ name: string; url: string }> = [];
+		try {
+			if (savedServers) { servers = JSON.parse(savedServers); }
+		} catch { /* ignore */ }
+
+		if (servers.length === 0) {
+			const empty = document.createElement('div');
+			empty.className = 'devteam-settings-stub';
+			empty.textContent = 'No MCP servers configured.';
+			container.appendChild(empty);
+		} else {
+			for (const server of servers) {
+				const row = document.createElement('div');
+				row.className = 'devteam-mcp-server-row';
+
+				const name = document.createElement('span');
+				name.className = 'devteam-mcp-server-name';
+				name.textContent = server.name;
+
+				const url = document.createElement('span');
+				url.className = 'devteam-mcp-server-url';
+				url.textContent = server.url;
+
+				const removeBtn = document.createElement('button');
+				removeBtn.className = 'devteam-mcp-remove-btn';
+				removeBtn.textContent = '\u00D7'; // multiplication sign (x)
+				removeBtn.addEventListener('click', () => {
+					const updated = servers.filter(s => s.name !== server.name);
+					this.storageService.store(this.STORAGE_KEYS.mcpServers, JSON.stringify(updated), StorageScope.APPLICATION, StorageTarget.USER);
+					row.remove();
+				});
+
+				row.appendChild(name);
+				row.appendChild(url);
+				row.appendChild(removeBtn);
+				container.appendChild(row);
+			}
+		}
+
+		return container;
+	}
+
+	private createAddMcpButton(): HTMLElement {
+		const row = document.createElement('div');
+		row.className = 'devteam-settings-row';
+
+		const btn = document.createElement('button');
+		btn.className = 'devteam-btn devteam-btn-test';
+		btn.textContent = '+ Add MCP Server';
+
+		btn.addEventListener('click', () => {
+			const name = prompt('MCP Server Name:', '');
+			if (!name) { return; }
+			const url = prompt('MCP Server URL:', 'http://localhost:');
+			if (!url) { return; }
+
+			const savedServers = this.storageService.get(this.STORAGE_KEYS.mcpServers, StorageScope.APPLICATION, '');
+			let servers: Array<{ name: string; url: string }> = [];
+			try { if (savedServers) { servers = JSON.parse(savedServers); } } catch { /* ignore */ }
+			servers.push({ name, url });
+			this.storageService.store(this.STORAGE_KEYS.mcpServers, JSON.stringify(servers), StorageScope.APPLICATION, StorageTarget.USER);
+
+			// Refresh the pane — simplest approach is to reconnect which rebuilds UI
+			try { this.devClawService.reconnect(); } catch { /* ignore */ }
+		});
+
+		row.appendChild(btn);
+		return row;
+	}
+
 }
 
 const SETTINGS_STYLES = `
@@ -664,4 +857,82 @@ const SETTINGS_STYLES = `
 		border-radius: 4px;
 		border: 1px dashed #2a2a3e;
 	}
+
+	.devteam-settings-toggle-row {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.devteam-toggle-pill {
+		padding: 3px 12px;
+		border-radius: 12px;
+		font-family: inherit;
+		font-size: 11px;
+		font-weight: 600;
+		cursor: pointer;
+		border: none;
+		transition: all 0.15s;
+	}
+
+	.devteam-toggle-pill.on {
+		background: #4caf5022;
+		color: #4caf50;
+	}
+
+	.devteam-toggle-pill.off {
+		background: #f4433622;
+		color: #f44336;
+	}
+
+	.devteam-toggle-pill:hover {
+		opacity: 0.8;
+	}
+
+	.devteam-mcp-list {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.devteam-mcp-server-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 6px 8px;
+		background: #1a1a2e;
+		border: 1px solid #2a2a3e;
+		border-radius: 4px;
+	}
+
+	.devteam-mcp-server-name {
+		color: #00d4ff;
+		font-size: 12px;
+		font-weight: 600;
+		min-width: 80px;
+	}
+
+	.devteam-mcp-server-url {
+		color: #808080;
+		font-size: 11px;
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.devteam-mcp-remove-btn {
+		background: transparent;
+		border: none;
+		color: #f44336;
+		font-size: 16px;
+		cursor: pointer;
+		padding: 0 4px;
+		line-height: 1;
+	}
+
+	.devteam-mcp-remove-btn:hover {
+		color: #ff6659;
+	}
 `;
+
