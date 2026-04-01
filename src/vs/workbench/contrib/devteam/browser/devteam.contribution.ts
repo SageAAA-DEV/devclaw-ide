@@ -27,29 +27,37 @@ import { SkillsEditorPane, SkillsEditorInput } from './editors/skillsEditor.js';
 import { ToolsEditorPane, ToolsEditorInput } from './editors/toolsEditor.js';
 import { SessionsEditorPane, SessionsEditorInput } from './editors/sessionsEditor.js';
 import { ModelsEditorPane, ModelsEditorInput } from './editors/modelsEditor.js';
+import { ConfigEditorPane, ConfigEditorInput } from './editors/configEditor.js';
+import { ChannelsEditorPane, ChannelsEditorInput } from './editors/channelsEditor.js';
+import { NodesEditorPane, NodesEditorInput } from './editors/nodesEditor.js';
+import { CronEditorPane, CronEditorInput } from './editors/cronEditor.js';
+import { LogsEditorPane, LogsEditorInput } from './editors/logsEditor.js';
+import { UsageEditorPane, UsageEditorInput } from './editors/usageEditor.js';
+import { OverviewEditorPane, OverviewEditorInput } from './editors/overviewEditor.js';
 
 const editorPaneRegistry = Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane);
 
-editorPaneRegistry.registerEditorPane(
-	EditorPaneDescriptor.create(AgentsEditorPane, AgentsEditorPane.ID, localize('agentsEditor', 'Agents')),
-	[new SyncDescriptor(AgentsEditorInput)]
-);
-editorPaneRegistry.registerEditorPane(
-	EditorPaneDescriptor.create(SkillsEditorPane, SkillsEditorPane.ID, localize('skillsEditor', 'Skills')),
-	[new SyncDescriptor(SkillsEditorInput)]
-);
-editorPaneRegistry.registerEditorPane(
-	EditorPaneDescriptor.create(ToolsEditorPane, ToolsEditorPane.ID, localize('toolsEditor', 'Tools')),
-	[new SyncDescriptor(ToolsEditorInput)]
-);
-editorPaneRegistry.registerEditorPane(
-	EditorPaneDescriptor.create(SessionsEditorPane, SessionsEditorPane.ID, localize('sessionsEditor', 'Sessions')),
-	[new SyncDescriptor(SessionsEditorInput)]
-);
-editorPaneRegistry.registerEditorPane(
-	EditorPaneDescriptor.create(ModelsEditorPane, ModelsEditorPane.ID, localize('modelsEditor', 'Models')),
-	[new SyncDescriptor(ModelsEditorInput)]
-);
+const panels = [
+	{ pane: AgentsEditorPane, input: AgentsEditorInput, label: 'Agents' },
+	{ pane: SkillsEditorPane, input: SkillsEditorInput, label: 'Skills' },
+	{ pane: ToolsEditorPane, input: ToolsEditorInput, label: 'Tools' },
+	{ pane: SessionsEditorPane, input: SessionsEditorInput, label: 'Sessions' },
+	{ pane: ModelsEditorPane, input: ModelsEditorInput, label: 'Models' },
+	{ pane: ConfigEditorPane, input: ConfigEditorInput, label: 'Config' },
+	{ pane: ChannelsEditorPane, input: ChannelsEditorInput, label: 'Channels' },
+	{ pane: NodesEditorPane, input: NodesEditorInput, label: 'Nodes' },
+	{ pane: CronEditorPane, input: CronEditorInput, label: 'Cron Jobs' },
+	{ pane: LogsEditorPane, input: LogsEditorInput, label: 'Logs' },
+	{ pane: UsageEditorPane, input: UsageEditorInput, label: 'Usage' },
+	{ pane: OverviewEditorPane, input: OverviewEditorInput, label: 'Overview' },
+];
+
+for (const { pane, input, label } of panels) {
+	editorPaneRegistry.registerEditorPane(
+		EditorPaneDescriptor.create(pane, pane.ID, localize(`editor.${label}`, label)),
+		[new SyncDescriptor(input)]
+	);
+}
 
 // --- Register OpenClaw as native chat participant ---
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';

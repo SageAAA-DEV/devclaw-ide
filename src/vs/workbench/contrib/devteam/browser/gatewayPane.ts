@@ -19,16 +19,24 @@ import { IStorageService, StorageScope } from '../../../../platform/storage/comm
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { OpenClawRpcClient } from '../common/openClawRpcClient.js';
 import type { GatewayHealthResult } from '../common/gatewayTypes.js';
+import { EditorInput } from '../../../common/editor/editorInput.js';
 import { AgentsEditorInput } from './editors/agentsEditor.js';
 import { SkillsEditorInput } from './editors/skillsEditor.js';
 import { ToolsEditorInput } from './editors/toolsEditor.js';
 import { SessionsEditorInput } from './editors/sessionsEditor.js';
 import { ModelsEditorInput } from './editors/modelsEditor.js';
+import { ConfigEditorInput } from './editors/configEditor.js';
+import { ChannelsEditorInput } from './editors/channelsEditor.js';
+import { NodesEditorInput } from './editors/nodesEditor.js';
+import { CronEditorInput } from './editors/cronEditor.js';
+import { LogsEditorInput } from './editors/logsEditor.js';
+import { UsageEditorInput } from './editors/usageEditor.js';
+import { OverviewEditorInput } from './editors/overviewEditor.js';
 
 interface NavItem {
 	label: string;
 	icon: string;
-	createInput: () => AgentsEditorInput | SkillsEditorInput | ToolsEditorInput | SessionsEditorInput | ModelsEditorInput;
+	createInput: () => EditorInput;
 }
 
 export class GatewayPane extends ViewPane {
@@ -72,12 +80,20 @@ export class GatewayPane extends ViewPane {
 		content.appendChild(this.createStatusSection());
 
 		// Navigation items — each opens an editor tab
+		// allow-any-unicode-next-line
 		const navItems: NavItem[] = [
+			{ label: 'Overview', icon: '\uD83C\uDFE0', createInput: () => new OverviewEditorInput() },
 			{ label: 'Agents', icon: '\uD83E\uDD16', createInput: () => new AgentsEditorInput() },
 			{ label: 'Skills', icon: '\u26A1', createInput: () => new SkillsEditorInput() },
 			{ label: 'Tools', icon: '\uD83D\uDD27', createInput: () => new ToolsEditorInput() },
 			{ label: 'Sessions', icon: '\uD83D\uDCCB', createInput: () => new SessionsEditorInput() },
 			{ label: 'Models', icon: '\uD83E\uDDE0', createInput: () => new ModelsEditorInput() },
+			{ label: 'Config', icon: '\u2699', createInput: () => new ConfigEditorInput() },
+			{ label: 'Channels', icon: '\uD83D\uDCE1', createInput: () => new ChannelsEditorInput() },
+			{ label: 'Nodes', icon: '\uD83D\uDDA5', createInput: () => new NodesEditorInput() },
+			{ label: 'Cron Jobs', icon: '\u23F0', createInput: () => new CronEditorInput() },
+			{ label: 'Logs', icon: '\uD83D\uDCDC', createInput: () => new LogsEditorInput() },
+			{ label: 'Usage', icon: '\uD83D\uDCCA', createInput: () => new UsageEditorInput() },
 		];
 
 		const nav = document.createElement('div');
