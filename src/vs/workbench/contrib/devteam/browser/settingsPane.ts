@@ -50,6 +50,7 @@ export class DevTeamSettingsPane extends ViewPane {
 		// Database
 		dbType: 'devteam.db.type',
 		dbConnectionString: 'devteam.db.connectionString',
+		dbAuthToken: 'devteam.db.authToken',
 		// MCP Servers
 		mcpServers: 'devteam.mcp.servers',
 		// Legacy (kept for migration compat)
@@ -147,6 +148,7 @@ export class DevTeamSettingsPane extends ViewPane {
 		content.appendChild(this.createSection('Database', [
 			this.createDbTypeDropdown(),
 			this.createInput('Connection String', 'dbConnectionString', 'libsql://your-db.turso.io', 'text'),
+			this.createInput('Auth Token', 'dbAuthToken', 'eyJ... (database auth token)', 'password'),
 			this.createTestDbButton(),
 		]));
 
@@ -650,31 +652,116 @@ export class DevTeamSettingsPane extends ViewPane {
 	}
 
 	private createAddMcpButton(): HTMLElement {
-		const row = document.createElement('div');
-		row.className = 'devteam-settings-row';
+		const container = document.createElement('div');
+		container.className = 'devteam-mcp-add-form';
 
+		// Name input
+		const nameRow = document.createElement('div');
+		nameRow.className = 'devteam-settings-row';
+		const nameLabel = document.createElement('label');
+		nameLabel.className = 'devteam-settings-label';
+		nameLabel.textContent = 'Server Name';
+		const nameInput = document.createElement('input');
+		nameInput.className = 'devteam-settings-input';
+		nameInput.type = 'text';
+		nameInput.placeholder = 'my-mcp-server';
+		nameInput.spellcheck = false;
+		nameRow.appendChild(nameLabel);
+		nameRow.appendChild(nameInput);
+
+		// URL input
+		const urlRow = document.createElement('div');
+		urlRow.className = 'devteam-settings-row';
+		const urlLabel = document.createElement('label');
+		urlLabel.className = 'devteam-settings-label';
+		urlLabel.textContent = 'Server URL';
+		const urlInput = document.createElement('input');
+		urlInput.className = 'devteam-settings-input';
+		urlInput.type = 'text';
+		urlInput.placeholder = 'http://localhost:3001';
+		urlInput.spellcheck = false;
+		urlRow.appendChild(urlLabel);
+		urlRow.appendChild(urlInput);
+
+		// Add button + status
+		const btnRow = document.createElement('div');
+		btnRow.className = 'devteam-settings-row';
 		const btn = document.createElement('button');
 		btn.className = 'devteam-btn devteam-btn-test';
 		btn.textContent = '+ Add MCP Server';
 
+		const status = document.createElement('span');
+		status.className = 'devteam-connection-status';
+
+		// Reference to the MCP list container so we can update it
+		const listContainer = container.parentElement?.querySelector('.devteam-mcp-list');
+
 		btn.addEventListener('click', () => {
-			const name = prompt('MCP Server Name:', '');
-			if (!name) { return; }
-			const url = prompt('MCP Server URL:', 'http://localhost:');
-			if (!url) { return; }
+			const name = nameInput.value.trim();
+			const url = urlInput.value.trim();
+
+			if (!name || !url) {
+				status.textContent = 'Name and URL are required';
+				status.className = 'devteam-connection-status error';
+				return;
+			}
 
 			const savedServers = this.storageService.get(this.STORAGE_KEYS.mcpServers, StorageScope.APPLICATION, '');
 			let servers: Array<{ name: string; url: string }> = [];
 			try { if (savedServers) { servers = JSON.parse(savedServers); } } catch { /* ignore */ }
+
+			if (servers.some(s => s.name === name)) {
+				status.textContent = 'Server with this name already exists';
+				status.className = 'devteam-connection-status error';
+				return;
+			}
+
 			servers.push({ name, url });
 			this.storageService.store(this.STORAGE_KEYS.mcpServers, JSON.stringify(servers), StorageScope.APPLICATION, StorageTarget.USER);
 
-			// Refresh the pane — simplest approach is to reconnect which rebuilds UI
-			try { this.devClawService.reconnect(); } catch { /* ignore */ }
+			// Add row to the list visually
+			if (listContainer) {
+				// Remove "No MCP servers" stub if present
+				const stub = listContainer.querySelector('.devteam-settings-stub');
+				if (stub) { stub.remove(); }
+
+				const row = document.createElement('div');
+				row.className = 'devteam-mcp-server-row';
+				const nameEl = document.createElement('span');
+				nameEl.className = 'devteam-mcp-server-name';
+				nameEl.textContent = name;
+				const urlEl = document.createElement('span');
+				urlEl.className = 'devteam-mcp-server-url';
+				urlEl.textContent = url;
+				const removeBtn = document.createElement('button');
+				removeBtn.className = 'devteam-mcp-remove-btn';
+				// allow-any-unicode-next-line
+				removeBtn.textContent = '\u00D7';
+				removeBtn.addEventListener('click', () => {
+					const updated = servers.filter(s => s.name !== name);
+					this.storageService.store(this.STORAGE_KEYS.mcpServers, JSON.stringify(updated), StorageScope.APPLICATION, StorageTarget.USER);
+					row.remove();
+				});
+				row.appendChild(nameEl);
+				row.appendChild(urlEl);
+				row.appendChild(removeBtn);
+				listContainer.appendChild(row);
+			}
+
+			// Clear inputs
+			nameInput.value = '';
+			urlInput.value = '';
+			status.textContent = `Added ${name}`;
+			status.className = 'devteam-connection-status success';
 		});
 
-		row.appendChild(btn);
-		return row;
+		btnRow.appendChild(btn);
+		btnRow.appendChild(status);
+
+		container.appendChild(nameRow);
+		container.appendChild(urlRow);
+		container.appendChild(btnRow);
+		return container;
 	}
 
 }
