@@ -35,18 +35,23 @@ registerWorkbenchContribution2(WelcomeWizardContribution.ID, WelcomeWizardContri
 
 import { DevTeamSettingsPane } from './settingsPane.js';
 import { DevClawAgentsPane } from './agentsPane.js';
+import { GatewayPane } from './gatewayPane.js';
 
 // --- Icons ---
 const devteamAgentsIcon = registerIcon('devteam-agents-icon', Codicon.organization, localize('devteamAgentsIcon', 'DevClaw Agents view icon'));
 const devteamSettingsIcon = registerIcon('devteam-settings-icon', Codicon.settingsGear, localize('devteamSettingsIcon', 'DevClaw Settings view icon'));
+// allow-any-unicode-next-line
+const devteamGatewayIcon = registerIcon('devteam-gateway-icon', Codicon.settings, localize('devteamGatewayIcon', 'OpenClaw Gateway view icon'));
 
 // --- View Container IDs ---
 export const DEVTEAM_AGENTS_VIEWLET_ID = 'workbench.view.devteam-agents';
 export const DEVTEAM_SETTINGS_VIEWLET_ID = 'workbench.view.devteam-settings';
+export const DEVTEAM_GATEWAY_VIEWLET_ID = 'workbench.view.devteam-gateway';
 
 // --- View IDs ---
 export const DEVTEAM_AGENTS_VIEW_ID = 'devteam.agentsView';
 export const DEVTEAM_SETTINGS_VIEW_ID = 'devteam.settingsView';
+export const DEVTEAM_GATEWAY_VIEW_ID = 'devteam.gatewayView';
 
 const viewContainersRegistry = Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegistry);
 const viewsRegistry = Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry);
@@ -88,6 +93,25 @@ viewsRegistry.registerViews([{
 	canMoveView: false,
 	order: 0,
 }], settingsContainer);
+
+// --- Gateway (left sidebar — OpenClaw control panel) ---
+const gatewayContainer = viewContainersRegistry.registerViewContainer({
+	id: DEVTEAM_GATEWAY_VIEWLET_ID,
+	title: localize2('devteam.gateway', 'OpenClaw Gateway'),
+	ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [DEVTEAM_GATEWAY_VIEWLET_ID, { mergeViewWithContainerWhenSingleView: true }]),
+	icon: devteamGatewayIcon,
+	order: 12,
+}, ViewContainerLocation.Sidebar);
+
+viewsRegistry.registerViews([{
+	id: DEVTEAM_GATEWAY_VIEW_ID,
+	name: localize2('devteam.gatewayView', 'OpenClaw Gateway'),
+	ctorDescriptor: new SyncDescriptor(GatewayPane),
+	containerIcon: devteamGatewayIcon,
+	canToggleVisibility: false,
+	canMoveView: false,
+	order: 0,
+}], gatewayContainer);
 
 // --- Editor Context Menu: Ask Agent, Explain, Refactor ---
 import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
