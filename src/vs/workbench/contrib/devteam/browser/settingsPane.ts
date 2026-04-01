@@ -17,10 +17,11 @@ import { IStorageService, StorageScope, StorageTarget } from '../../../../platfo
 import { IDevClawService } from './devclawService.js';
 import { IOpenClawDaemonService } from '../../../../platform/openclaw/common/openclawDaemon.js';
 
-const PROVIDERS = ['Anthropic', 'OpenAI', 'MiniMax', 'OpenRouter'] as const;
+const PROVIDERS = ['CTRL-A', 'Anthropic', 'OpenAI', 'MiniMax', 'OpenRouter'] as const;
 type Provider = typeof PROVIDERS[number];
 
 const PROVIDER_PLACEHOLDERS: Record<Provider, string> = {
+	'CTRL-A': 'app_...',
 	'Anthropic': 'sk-ant-...',
 	'OpenAI': 'sk-...',
 	'MiniMax': 'eyJ...',

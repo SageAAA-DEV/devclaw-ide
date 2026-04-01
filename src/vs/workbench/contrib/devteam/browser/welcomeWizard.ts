@@ -16,9 +16,10 @@ const OPENCLAW_PORT_KEY = 'devteam.openclaw.port';
 const OPENCLAW_TOKEN_KEY = 'devteam.openclaw.token';
 const BACKEND_KEY = 'devteam.backend';
 
-type Provider = 'anthropic' | 'openai' | 'minimax' | 'openrouter';
+type Provider = 'ctrl-a' | 'anthropic' | 'openai' | 'minimax' | 'openrouter';
 
 const PROVIDER_LABELS: Record<Provider, string> = {
+	'ctrl-a': 'CTRL-A',
 	anthropic: 'Anthropic',
 	openai: 'OpenAI',
 	minimax: 'MiniMax',
@@ -26,6 +27,7 @@ const PROVIDER_LABELS: Record<Provider, string> = {
 };
 
 const PROVIDER_PLACEHOLDERS: Record<Provider, string> = {
+	'ctrl-a': 'app_... (CTRL-A App Key)',
 	anthropic: 'sk-ant-...',
 	openai: 'sk-...',
 	minimax: 'eyJ... (MiniMax API Key)',
@@ -252,7 +254,7 @@ export class WelcomeWizardContribution extends Disposable implements IWorkbenchC
 		providerSelect.className = 'devteam-wizard-select';
 		providerSelect.id = 'devteam-provider-select';
 
-		const providers: Provider[] = ['anthropic', 'openai', 'minimax', 'openrouter'];
+		const providers: Provider[] = ['ctrl-a', 'anthropic', 'openai', 'minimax', 'openrouter'];
 		for (const p of providers) {
 			const opt = document.createElement('option');
 			opt.value = p;
