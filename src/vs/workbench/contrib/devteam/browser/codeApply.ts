@@ -1,7 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  DevTeam IDE - Code Apply
- *  Applies agent-generated code to the editor.
- *  Copilot mode: user clicks Apply on code blocks.
+ *  Copyright (c) SageAAA / DevClaw Contributors. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { URI } from '../../../../base/common/uri.js';
@@ -60,16 +59,31 @@ export class CodeApplyService {
 	}
 
 	private resolveUri(filePath: string): URI {
-		// If workspace is open, resolve relative to workspace root
-		const folders = this.workspaceService.getWorkspace().folders;
-		if (folders.length > 0) {
-			return URI.joinPath(folders[0].uri, filePath);
-		}
-		// Fallback: treat as absolute or relative to home
+		// Reject absolute paths — agent code must use workspace-relative paths
 		if (filePath.startsWith('/') || filePath.match(/^[A-Za-z]:/)) {
-			return URI.file(filePath);
+			throw new Error(`Absolute paths are not allowed: ${filePath}`);
 		}
-		// No workspace open — can't resolve relative path
-		throw new Error(`No workspace open. Cannot resolve relative path: ${filePath}`);
+
+		// Reject path traversal sequences
+		const normalized = filePath.replace(/\\/g, '/');
+		if (normalized.split('/').some(seg => seg === '..')) {
+			throw new Error(`Path traversal is not allowed: ${filePath}`);
+		}
+
+		// Resolve relative to workspace root
+		const folders = this.workspaceService.getWorkspace().folders;
+		if (folders.length === 0) {
+			throw new Error(`No workspace open. Cannot resolve relative path: ${filePath}`);
+		}
+
+		const rootUri = folders[0].uri;
+		const resolved = URI.joinPath(rootUri, normalized);
+
+		// Belt-and-suspenders: ensure resolved path is still inside workspace
+		if (!resolved.path.startsWith(rootUri.path)) {
+			throw new Error(`Resolved path escapes workspace: ${filePath}`);
+		}
+
+		return resolved;
 	}
 }

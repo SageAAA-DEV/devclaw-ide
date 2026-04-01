@@ -23,6 +23,13 @@ const copyrightHeaderLines = [
 	' *--------------------------------------------------------------------------------------------*/',
 ];
 
+const devclawCopyrightHeaderLines = [
+	'/*---------------------------------------------------------------------------------------------',
+	' *  Copyright (c) SageAAA / DevClaw Contributors. All rights reserved.',
+	' *  Licensed under the MIT License. See License.txt in the project root for license information.',
+	' *--------------------------------------------------------------------------------------------*/',
+];
+
 interface VinylFileWithLines extends VinylFile {
 	__lines: string[];
 }
@@ -107,12 +114,13 @@ export function hygiene(some: NodeJS.ReadWriteStream | string[] | undefined, run
 	const copyrights = es.through(function (file: VinylFileWithLines) {
 		const lines = file.__lines;
 
-		for (let i = 0; i < copyrightHeaderLines.length; i++) {
-			if (lines[i] !== copyrightHeaderLines[i]) {
-				console.error(file.relative + ': Missing or bad copyright statement');
-				errorCount++;
-				break;
-			}
+		// Accept either Microsoft or DevClaw copyright headers
+		const matchesMicrosoft = copyrightHeaderLines.every((line, i) => lines[i] === line);
+		const matchesDevClaw = devclawCopyrightHeaderLines.every((line, i) => lines[i] === line);
+
+		if (!matchesMicrosoft && !matchesDevClaw) {
+			console.error(file.relative + ': Missing or bad copyright statement');
+			errorCount++;
 		}
 
 		this.emit('data', file);

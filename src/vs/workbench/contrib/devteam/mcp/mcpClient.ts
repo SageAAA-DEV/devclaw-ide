@@ -1,7 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  DevClaw - MCP Client for Claude Code Bridge
- *  Spawns `claude mcp serve` and communicates via JSON-RPC over stdio.
- *  Pro-only feature: control Claude Code from your IDE.
+ *  Copyright (c) SageAAA / DevClaw Contributors. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as cp from 'child_process';
@@ -46,7 +45,7 @@ export class McpClaudeCodeClient {
 			try {
 				this.process = cp.spawn('claude', ['mcp', 'serve'], {
 					stdio: ['pipe', 'pipe', 'pipe'],
-					shell: true,
+					shell: false,
 				});
 
 				this.process.stdout?.on('data', (data: Buffer) => {

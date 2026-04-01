@@ -16,6 +16,7 @@ import { IHoverService } from '../../../../platform/hover/browser/hover.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
+import { addDisposableListener } from '../../../../base/browser/dom.js';
 import { CodeApplyService } from './codeApply.js';
 import { IDevClawService } from './devclawService.js';
 
@@ -109,12 +110,12 @@ export class DevTeamChatPane extends ViewPane {
 		this.inputEl.placeholder = 'Message your agent team...';
 		this.inputEl.spellcheck = false;
 
-		this.inputEl.addEventListener('keydown', (e) => {
+		this._register(addDisposableListener(this.inputEl, 'keydown', (e: KeyboardEvent) => {
 			if (e.key === 'Enter' && this.inputEl.value.trim()) {
 				this.handleSend(this.inputEl.value.trim());
 				this.inputEl.value = '';
 			}
-		});
+		}));
 
 		inputBar.appendChild(this.inputEl);
 		container.appendChild(inputBar);

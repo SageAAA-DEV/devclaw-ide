@@ -4,7 +4,7 @@
 	"description": "Built-in browser automation for DevClaw agents. Inspect pages, check console, take screenshots.",
 	"version": "0.1.0",
 	"publisher": "sageaaa",
-	"license": "Proprietary",
+	"license": "MIT",
 	"engines": {
 		"vscode": "^1.114.0"
 	},
