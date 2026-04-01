@@ -19,6 +19,38 @@ import './openclawDaemonStub.js'; // browser-safe IOpenClawDaemonService stub
 import './privacyConsent.js'; // Privacy consent dialog on first launch
 import './settingsImport.js'; // Settings import commands for VS Code, Cursor, Windsurf, Antigravity
 
+// --- Register Gateway Editor Panes ---
+import { EditorPaneDescriptor, IEditorPaneRegistry } from '../../../browser/editor.js';
+import { EditorExtensions } from '../../../common/editor.js';
+import { AgentsEditorPane, AgentsEditorInput } from './editors/agentsEditor.js';
+import { SkillsEditorPane, SkillsEditorInput } from './editors/skillsEditor.js';
+import { ToolsEditorPane, ToolsEditorInput } from './editors/toolsEditor.js';
+import { SessionsEditorPane, SessionsEditorInput } from './editors/sessionsEditor.js';
+import { ModelsEditorPane, ModelsEditorInput } from './editors/modelsEditor.js';
+
+const editorPaneRegistry = Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane);
+
+editorPaneRegistry.registerEditorPane(
+	EditorPaneDescriptor.create(AgentsEditorPane, AgentsEditorPane.ID, localize('agentsEditor', 'Agents')),
+	[new SyncDescriptor(AgentsEditorInput)]
+);
+editorPaneRegistry.registerEditorPane(
+	EditorPaneDescriptor.create(SkillsEditorPane, SkillsEditorPane.ID, localize('skillsEditor', 'Skills')),
+	[new SyncDescriptor(SkillsEditorInput)]
+);
+editorPaneRegistry.registerEditorPane(
+	EditorPaneDescriptor.create(ToolsEditorPane, ToolsEditorPane.ID, localize('toolsEditor', 'Tools')),
+	[new SyncDescriptor(ToolsEditorInput)]
+);
+editorPaneRegistry.registerEditorPane(
+	EditorPaneDescriptor.create(SessionsEditorPane, SessionsEditorPane.ID, localize('sessionsEditor', 'Sessions')),
+	[new SyncDescriptor(SessionsEditorInput)]
+);
+editorPaneRegistry.registerEditorPane(
+	EditorPaneDescriptor.create(ModelsEditorPane, ModelsEditorPane.ID, localize('modelsEditor', 'Models')),
+	[new SyncDescriptor(ModelsEditorInput)]
+);
+
 // --- Register OpenClaw as native chat participant ---
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 import { DevClawAgentRegistration } from './devclawAgents.js';
