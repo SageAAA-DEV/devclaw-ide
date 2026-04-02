@@ -1,14 +1,29 @@
-<!-- BEGIN MICROSOFT SECURITY.MD V1.0.0 BLOCK -->
+# Security Policy
 
-## Security
+## Reporting Security Vulnerabilities
 
-Microsoft takes the security of our software products and services seriously, which
-includes all source code repositories in our GitHub organizations.
+We take security seriously. If you find a security vulnerability, please report it responsibly.
 
-**Please do not report security vulnerabilities through public GitHub issues.**
+**Do NOT report security issues through public GitHub issues.**
 
-For security reporting information, locations, contact information, and policies,
-please review the latest guidance for Microsoft repositories at
-[https://aka.ms/SECURITY.md](https://aka.ms/SECURITY.md).
+### How to Report
 
-<!-- END MICROSOFT SECURITY.MD BLOCK -->
+Email: security@sageaaa.com
+
+We aim to respond within 48 hours.
+
+## Supported Versions
+
+| Version | Supported          |
+| ------- | ------------------ |
+| 1.x.x   | ✅ Active Support |
+
+## Security Best Practices
+
+- Keep your API keys secure — never commit them to the repo
+- Run the OpenClaw gateway locally for maximum privacy
+- Review agent permissions before granting tool access
+
+---
+
+Built with 🔒 by [SageAAA](https://sageaaa.com)
