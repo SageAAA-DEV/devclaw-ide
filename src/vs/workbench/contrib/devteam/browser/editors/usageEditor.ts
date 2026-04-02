@@ -368,7 +368,7 @@ export class UsageEditorPane extends EditorPane {
 
 const USAGE_EDITOR_STYLES = `
 	.gw-usage-root {
-		background: #0d0d1a;
+		background: #0f1a1e;
 		color: #e0e0e0;
 		font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 		overflow-y: auto;
@@ -377,12 +377,12 @@ const USAGE_EDITOR_STYLES = `
 	}
 
 	.gw-usage-header {
-		color: #00d4ff;
+		color: #e85555;
 		font-size: 16px;
 		font-weight: 600;
 		margin-bottom: 20px;
 		padding-bottom: 10px;
-		border-bottom: 1px solid #2a2a3e;
+		border-bottom: 1px solid #2a3a3e;
 		letter-spacing: 0.3px;
 	}
 
@@ -394,7 +394,7 @@ const USAGE_EDITOR_STYLES = `
 
 	.gw-usage-card {
 		background: #12122a;
-		border: 1px solid #2a2a3e;
+		border: 1px solid #2a3a3e;
 		border-radius: 8px;
 		padding: 24px 32px;
 		text-align: center;
@@ -404,7 +404,7 @@ const USAGE_EDITOR_STYLES = `
 	.gw-usage-card-value {
 		font-size: 32px;
 		font-weight: 700;
-		color: #00d4ff;
+		color: #e85555;
 		line-height: 1.2;
 	}
 
@@ -446,14 +446,14 @@ const USAGE_EDITOR_STYLES = `
 	.gw-usage-bar-container {
 		flex: 1;
 		height: 20px;
-		background: #1a1a2e;
+		background: #1a2a2e;
 		border-radius: 4px;
 		overflow: hidden;
 	}
 
 	.gw-usage-bar {
 		height: 100%;
-		background: linear-gradient(90deg, #00d4ff, #0088aa);
+		background: linear-gradient(90deg, #e85555, #0088aa);
 		border-radius: 4px;
 		transition: width 0.3s ease;
 	}
@@ -480,7 +480,7 @@ const USAGE_EDITOR_STYLES = `
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 		padding: 8px 12px;
-		border-bottom: 1px solid #2a2a3e;
+		border-bottom: 1px solid #2a3a3e;
 	}
 
 	.gw-usage-row {
@@ -488,12 +488,12 @@ const USAGE_EDITOR_STYLES = `
 	}
 
 	.gw-usage-row:hover {
-		background: #00d4ff08;
+		background: #e8555508;
 	}
 
 	.gw-usage-td {
 		padding: 10px 12px;
-		border-bottom: 1px solid #1a1a2e;
+		border-bottom: 1px solid #1a2a2e;
 		color: #e0e0e0;
 	}
 

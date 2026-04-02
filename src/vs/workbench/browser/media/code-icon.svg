@@ -1,1 +1,30 @@
-<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><style>.st0{fill:#f6f6f6;fill-opacity:0}.st1{fill:#fff}.st2{fill:#167abf}</style><path class="st0" d="M1024 1024H0V0h1024v1024z"/><path class="st1" d="M1024 85.333v853.333H0V85.333h1024z"/><path class="st2" d="M0 85.333h298.667v853.333H0V85.333zm1024 0v853.333H384V85.333h640zm-554.667 160h341.333v-64H469.333v64zm341.334 533.334H469.333v64h341.333l.001-64zm128-149.334H597.333v64h341.333l.001-64zm0-149.333H597.333v64h341.333l.001-64zm0-149.333H597.333v64h341.333l.001-64z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Neon claw icon -->
+  <g filter="url(#glow)">
+    <!-- Outer claw (left pincer) -->
+    <path d="M90 55 Q50 70 40 120 Q35 155 55 180 Q70 195 85 185 Q75 160 80 130 Q85 105 100 90 Z"
+          fill="none" stroke="#ff3333" stroke-width="4" stroke-linecap="round"/>
+    <!-- Inner claw (right pincer) -->
+    <path d="M140 55 Q170 65 185 95 Q195 120 180 145 Q170 160 155 150 Q165 130 160 110 Q155 85 140 75 Z"
+          fill="none" stroke="#ff3333" stroke-width="4" stroke-linecap="round"/>
+    <!-- Claw joint / serrated edge -->
+    <path d="M100 90 Q110 70 120 65 Q130 62 140 75"
+          fill="none" stroke="#ff3333" stroke-width="3" stroke-linecap="round"/>
+    <path d="M108 80 L115 68 L122 78"
+          fill="none" stroke="#ff3333" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M125 75 L132 65 L138 78"
+          fill="none" stroke="#ff3333" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Base / stem -->
+    <path d="M85 185 Q95 210 110 220 Q120 225 128 220 Q140 210 145 195"
+          fill="none" stroke="#ff3333" stroke-width="3.5" stroke-linecap="round"/>
+  </g>
+</svg>

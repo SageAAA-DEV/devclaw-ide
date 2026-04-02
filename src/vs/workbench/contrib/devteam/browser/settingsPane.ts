@@ -97,7 +97,7 @@ export class DevTeamSettingsPane extends ViewPane {
 		container.style.cssText = `
 			display: flex;
 			flex-direction: column;
-			background: #0d0d1a;
+			background: #0f1a1e;
 			height: 100%;
 			overflow-y: auto;
 			font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
@@ -776,12 +776,12 @@ const SETTINGS_STYLES = `
 	}
 
 	.devteam-settings-heading {
-		color: #00d4ff;
+		color: #e85555;
 		font-size: 13px;
 		font-weight: 600;
 		margin: 0 0 12px 0;
 		padding-bottom: 6px;
-		border-bottom: 1px solid #2a2a3e;
+		border-bottom: 1px solid #2a3a3e;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 	}
@@ -801,8 +801,8 @@ const SETTINGS_STYLES = `
 	}
 
 	.devteam-settings-input {
-		background: #1a1a2e;
-		border: 1px solid #2a2a3e;
+		background: #1a2a2e;
+		border: 1px solid #2a3a3e;
 		border-radius: 4px;
 		padding: 8px 10px;
 		color: #e0e0e0;
@@ -813,7 +813,7 @@ const SETTINGS_STYLES = `
 	}
 
 	.devteam-settings-input:focus {
-		border-color: #00d4ff;
+		border-color: #e85555;
 	}
 
 	.devteam-settings-input::placeholder {
@@ -821,8 +821,8 @@ const SETTINGS_STYLES = `
 	}
 
 	.devteam-settings-select {
-		background: #1a1a2e;
-		border: 1px solid #2a2a3e;
+		background: #1a2a2e;
+		border: 1px solid #2a3a3e;
 		border-radius: 4px;
 		padding: 8px 10px;
 		color: #e0e0e0;
@@ -836,18 +836,18 @@ const SETTINGS_STYLES = `
 	}
 
 	.devteam-settings-select:focus {
-		border-color: #00d4ff;
+		border-color: #e85555;
 	}
 
 	.devteam-settings-select option {
-		background: #1a1a2e;
+		background: #1a2a2e;
 		color: #e0e0e0;
 	}
 
 	.devteam-toggle-container {
 		display: flex;
 		gap: 0;
-		border: 1px solid #2a2a3e;
+		border: 1px solid #2a3a3e;
 		border-radius: 4px;
 		overflow: hidden;
 	}
@@ -855,7 +855,7 @@ const SETTINGS_STYLES = `
 	.devteam-toggle-btn {
 		flex: 1;
 		padding: 6px 12px;
-		background: #1a1a2e;
+		background: #1a2a2e;
 		border: none;
 		color: #808080;
 		font-family: inherit;
@@ -865,12 +865,12 @@ const SETTINGS_STYLES = `
 	}
 
 	.devteam-toggle-btn:not(:last-child) {
-		border-right: 1px solid #2a2a3e;
+		border-right: 1px solid #2a3a3e;
 	}
 
 	.devteam-toggle-btn.active {
-		background: #00d4ff22;
-		color: #00d4ff;
+		background: #e8555522;
+		color: #e85555;
 	}
 
 	.devteam-daemon-status-row {
@@ -904,9 +904,9 @@ const SETTINGS_STYLES = `
 	.devteam-btn-test {
 		padding: 8px 16px;
 		background: transparent;
-		border: 1px solid #00d4ff33;
+		border: 1px solid #e8555533;
 		border-radius: 4px;
-		color: #00d4ff;
+		color: #e85555;
 		font-family: inherit;
 		font-size: 12px;
 		cursor: pointer;
@@ -914,7 +914,7 @@ const SETTINGS_STYLES = `
 	}
 
 	.devteam-btn-test:hover {
-		background: #00d4ff11;
+		background: #e8555511;
 	}
 
 	.devteam-btn-test:disabled {
@@ -940,9 +940,9 @@ const SETTINGS_STYLES = `
 		font-size: 12px;
 		font-style: italic;
 		padding: 8px;
-		background: #1a1a2e;
+		background: #1a2a2e;
 		border-radius: 4px;
-		border: 1px dashed #2a2a3e;
+		border: 1px dashed #2a3a3e;
 	}
 
 	.devteam-settings-toggle-row {
@@ -987,13 +987,13 @@ const SETTINGS_STYLES = `
 		align-items: center;
 		gap: 8px;
 		padding: 6px 8px;
-		background: #1a1a2e;
-		border: 1px solid #2a2a3e;
+		background: #1a2a2e;
+		border: 1px solid #2a3a3e;
 		border-radius: 4px;
 	}
 
 	.devteam-mcp-server-name {
-		color: #00d4ff;
+		color: #e85555;
 		font-size: 12px;
 		font-weight: 600;
 		min-width: 80px;

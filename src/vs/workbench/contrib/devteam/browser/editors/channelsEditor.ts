@@ -266,7 +266,7 @@ export class ChannelsEditorPane extends EditorPane {
 
 const CHANNELS_EDITOR_STYLES = `
 	.gw-channels-root {
-		background: #0d0d1a;
+		background: #0f1a1e;
 		color: #e0e0e0;
 		font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 		overflow-y: auto;
@@ -275,12 +275,12 @@ const CHANNELS_EDITOR_STYLES = `
 	}
 
 	.gw-channels-header {
-		color: #00d4ff;
+		color: #e85555;
 		font-size: 16px;
 		font-weight: 600;
 		margin-bottom: 20px;
 		padding-bottom: 10px;
-		border-bottom: 1px solid #2a2a3e;
+		border-bottom: 1px solid #2a3a3e;
 		letter-spacing: 0.3px;
 	}
 
@@ -292,7 +292,7 @@ const CHANNELS_EDITOR_STYLES = `
 
 	.gw-channels-card {
 		background: #13132a;
-		border: 1px solid #2a2a3e;
+		border: 1px solid #2a3a3e;
 		border-radius: 8px;
 		padding: 16px;
 		transition: background 0.15s, border-color 0.15s;

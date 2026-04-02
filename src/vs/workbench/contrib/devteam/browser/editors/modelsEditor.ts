@@ -34,7 +34,7 @@ interface IModelEntry {
 
 const STYLES = `
 .gw-models-root {
-	background: #0d0d1a;
+	background: #0f1a1e;
 	color: #e0e0e0;
 	height: 100%;
 	overflow-y: auto;
@@ -69,7 +69,7 @@ const STYLES = `
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.8px;
-	color: #00d4ff;
+	color: #e85555;
 	margin: 0 0 10px 0;
 }
 
@@ -91,12 +91,12 @@ const STYLES = `
 }
 
 .gw-models-card:hover {
-	border-color: #00d4ff66;
+	border-color: #e8555566;
 	background: #1a1a32;
 }
 
 .gw-models-card--default {
-	border-color: #00d4ff;
+	border-color: #e85555;
 	background: #12122a;
 }
 
@@ -118,8 +118,8 @@ const STYLES = `
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
-	color: #0d0d1a;
-	background: #00d4ff;
+	color: #0f1a1e;
+	background: #e85555;
 	padding: 2px 6px;
 	border-radius: 4px;
 	line-height: 1;

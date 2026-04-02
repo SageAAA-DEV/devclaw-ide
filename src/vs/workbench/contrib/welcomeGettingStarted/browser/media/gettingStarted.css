@@ -170,10 +170,111 @@
 	align-self: end;
 }
 
+/* OpenClaw Branded Header */
+.monaco-workbench .part.editor > .content .gettingStartedContainer .header.openclaw-header {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	gap: 4px;
+	padding-bottom: 12px;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .header.openclaw-header .openclaw-mascot {
+	width: 80px;
+	height: 80px;
+	filter: drop-shadow(0 0 20px rgba(232, 64, 64, 0.4));
+	margin-bottom: 4px;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .header.openclaw-header h1.openclaw-gradient {
+	background: linear-gradient(90deg, #e84040 0%, #e84040 40%, #888 70%, #666 100%);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+	font-size: 3em;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	margin: 0;
+	padding: 0;
+	line-height: 1.1;
+	white-space: nowrap;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .header.openclaw-header .openclaw-tagline {
+	font-size: 1.1em;
+	font-weight: 600;
+	letter-spacing: 0.15em;
+	text-transform: uppercase;
+	color: #aaa;
+	margin: 4px 0 0;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .header.openclaw-header .openclaw-subtitle {
+	font-size: 1.4em;
+	font-weight: 400;
+	color: var(--vscode-descriptionForeground);
+	margin: 2px 0 0;
+	opacity: 0.85;
+}
+
 .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories > .gettingStartedCategoriesContainer > .footer {
 	grid-area: footer;
 	justify-self: center;
 	text-align: center;
+}
+
+/* DevClaw Footer Brand */
+.monaco-workbench .part.editor > .content .gettingStartedContainer .devclaw-footer-brand {
+	font-size: 1.2em;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	margin: 0 0 4px;
+	opacity: 0.6;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .devclaw-footer-dev {
+	color: #e84040;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .devclaw-footer-claw {
+	color: var(--vscode-foreground);
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .devclaw-footer-edition {
+	color: var(--vscode-descriptionForeground);
+	font-weight: 400;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .devclaw-footer-lineage {
+	font-size: 0.8em;
+	color: var(--vscode-descriptionForeground);
+	margin: 2px 0 6px;
+	opacity: 0.5;
+	letter-spacing: 0.03em;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .devclaw-footer-builtby {
+	font-size: 0.85em;
+	color: var(--vscode-descriptionForeground);
+	margin: 0;
+	opacity: 0.7;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .devclaw-footer-sagelink {
+	font-size: 0.85em;
+	margin: 0 0 8px;
+	opacity: 0.7;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .devclaw-footer-sagelink a {
+	color: #e84040;
+	text-decoration: none;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .devclaw-footer-sagelink a:hover {
+	text-decoration: underline;
 }
 
 .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories .categories-slide-container {

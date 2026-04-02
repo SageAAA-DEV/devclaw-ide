@@ -78,7 +78,7 @@ export class DevTeamChatPane extends ViewPane {
 		container.style.cssText = `
 			display: flex;
 			flex-direction: column;
-			background: #0d0d1a;
+			background: #0f1a1e;
 			height: 100%;
 		`;
 
@@ -265,7 +265,7 @@ const CHAT_STYLES = `
 
 	.devteam-stream-item {
 		padding: 6px 0;
-		border-bottom: 1px solid #1a1a2e;
+		border-bottom: 1px solid #1a2a2e;
 	}
 
 	.devteam-stream-system {
@@ -288,7 +288,7 @@ const CHAT_STYLES = `
 	}
 
 	.devteam-agent-name {
-		color: #00d4ff;
+		color: #e85555;
 		font-weight: 600;
 		font-size: 12px;
 		margin-right: 8px;
@@ -306,8 +306,8 @@ const CHAT_STYLES = `
 	}
 
 	.devteam-code-block {
-		background: #1a1a2e;
-		border: 1px solid #2a2a3e;
+		background: #1a2a2e;
+		border: 1px solid #2a3a3e;
 		border-radius: 4px;
 		margin: 6px 0;
 		overflow: hidden;
@@ -318,7 +318,7 @@ const CHAT_STYLES = `
 		padding: 4px 10px;
 		color: #666;
 		font-size: 11px;
-		border-bottom: 1px solid #2a2a3e;
+		border-bottom: 1px solid #2a3a3e;
 	}
 
 	.devteam-code-block pre {
@@ -337,12 +337,12 @@ const CHAT_STYLES = `
 		display: flex;
 		gap: 6px;
 		padding: 6px 10px;
-		border-top: 1px solid #2a2a3e;
+		border-top: 1px solid #2a3a3e;
 	}
 
 	.devteam-btn {
 		padding: 3px 12px;
-		border: 1px solid #2a2a3e;
+		border: 1px solid #2a3a3e;
 		border-radius: 3px;
 		font-size: 11px;
 		cursor: pointer;
@@ -351,17 +351,17 @@ const CHAT_STYLES = `
 	}
 
 	.devteam-btn-apply {
-		color: #00d4ff;
-		border-color: #00d4ff33;
+		color: #e85555;
+		border-color: #e8555533;
 	}
 
 	.devteam-btn-apply:hover {
-		background: #00d4ff11;
+		background: #e8555511;
 	}
 
 	.devteam-btn-copy {
 		color: #808080;
-		border-color: #2a2a3e;
+		border-color: #2a3a3e;
 	}
 
 	.devteam-btn-copy:hover {
@@ -372,13 +372,13 @@ const CHAT_STYLES = `
 		display: flex;
 		align-items: center;
 		padding: 8px 12px;
-		border-top: 1px solid #2a2a3e;
+		border-top: 1px solid #2a3a3e;
 		background: #0a0a18;
 		flex-shrink: 0;
 	}
 
 	.devteam-prompt {
-		color: #00d4ff;
+		color: #e85555;
 		font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 		font-size: 14px;
 		font-weight: 700;
@@ -394,7 +394,7 @@ const CHAT_STYLES = `
 		color: #e0e0e0;
 		font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 		font-size: 13px;
-		caret-color: #00d4ff;
+		caret-color: #e85555;
 	}
 
 	.devteam-input::placeholder {

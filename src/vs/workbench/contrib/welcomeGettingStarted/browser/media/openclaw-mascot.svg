@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ff4444" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#ff4444" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Glow -->
+  <circle cx="60" cy="60" r="55" fill="url(#glow)"/>
+  <!-- Horns -->
+  <path d="M38 28 L42 18 L46 28" fill="#cc3333" stroke="none"/>
+  <path d="M74 28 L78 18 L82 28" fill="#cc3333" stroke="none"/>
+  <!-- Body -->
+  <ellipse cx="60" cy="58" rx="28" ry="30" fill="#e84040"/>
+  <!-- Ears / side bumps -->
+  <circle cx="30" cy="50" r="8" fill="#e84040"/>
+  <circle cx="90" cy="50" r="8" fill="#e84040"/>
+  <!-- Eyes -->
+  <circle cx="50" cy="48" r="5" fill="#1a1a2e"/>
+  <circle cx="70" cy="48" r="5" fill="#1a1a2e"/>
+  <!-- Eye highlights -->
+  <circle cx="48" cy="46" r="1.5" fill="#4aeadc"/>
+  <circle cx="68" cy="46" r="1.5" fill="#4aeadc"/>
+  <!-- Mouth -->
+  <ellipse cx="60" cy="62" rx="6" ry="3" fill="#1a1a2e"/>
+  <!-- Legs -->
+  <rect x="48" y="85" width="6" height="10" rx="3" fill="#e84040"/>
+  <rect x="66" y="85" width="6" height="10" rx="3" fill="#e84040"/>
+  <!-- Feet -->
+  <ellipse cx="51" cy="96" rx="5" ry="3" fill="#cc3333"/>
+  <ellipse cx="69" cy="96" rx="5" ry="3" fill="#cc3333"/>
+</svg>

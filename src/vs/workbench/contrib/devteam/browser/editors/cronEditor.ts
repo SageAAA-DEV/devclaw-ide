@@ -248,7 +248,7 @@ export class CronEditorPane extends EditorPane {
 
 const CRON_EDITOR_STYLES = `
 	.gw-cron-root {
-		background: #0d0d1a;
+		background: #0f1a1e;
 		color: #e0e0e0;
 		font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 		overflow-y: auto;
@@ -257,12 +257,12 @@ const CRON_EDITOR_STYLES = `
 	}
 
 	.gw-cron-header {
-		color: #00d4ff;
+		color: #e85555;
 		font-size: 16px;
 		font-weight: 600;
 		margin-bottom: 20px;
 		padding-bottom: 10px;
-		border-bottom: 1px solid #2a2a3e;
+		border-bottom: 1px solid #2a3a3e;
 		letter-spacing: 0.3px;
 	}
 
@@ -280,7 +280,7 @@ const CRON_EDITOR_STYLES = `
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 		padding: 8px 12px;
-		border-bottom: 1px solid #2a2a3e;
+		border-bottom: 1px solid #2a3a3e;
 	}
 
 	.gw-cron-row {
@@ -288,18 +288,18 @@ const CRON_EDITOR_STYLES = `
 	}
 
 	.gw-cron-row:hover {
-		background: #00d4ff08;
+		background: #e8555508;
 	}
 
 	.gw-cron-td {
 		padding: 10px 12px;
-		border-bottom: 1px solid #1a1a2e;
+		border-bottom: 1px solid #1a2a2e;
 		color: #e0e0e0;
 	}
 
 	.gw-cron-schedule {
 		font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-		color: #00d4ff;
+		color: #e85555;
 		font-size: 12px;
 	}
 

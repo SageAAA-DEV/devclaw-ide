@@ -17,6 +17,7 @@ import { IThemeService } from '../../../../platform/theme/common/themeService.js
 import { IHoverService } from '../../../../platform/hover/browser/hover.js';
 import { IStorageService, StorageScope } from '../../../../platform/storage/common/storage.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
+import { FileAccess } from '../../../../base/common/network.js';
 import { OpenClawRpcClient } from '../common/openClawRpcClient.js';
 import type { GatewayHealthResult } from '../common/gatewayTypes.js';
 import { EditorInput } from '../../../common/editor/editorInput.js';
@@ -36,6 +37,7 @@ import { OverviewEditorInput } from './editors/overviewEditor.js';
 interface NavItem {
 	label: string;
 	icon: string;
+	iconImage?: string;
 	createInput: () => EditorInput;
 }
 
@@ -67,7 +69,7 @@ export class GatewayPane extends ViewPane {
 	protected override renderBody(container: HTMLElement): void {
 		super.renderBody(container);
 
-		container.style.cssText = 'display:flex;flex-direction:column;background:#0d0d1a;height:100%;overflow-y:auto;font-family:"Cascadia Code","Fira Code",Consolas,monospace;';
+		container.style.cssText = 'display:flex;flex-direction:column;background:#0f1a1e;height:100%;overflow-y:auto;font-family:"Cascadia Code","Fira Code",Consolas,monospace;';
 
 		const style = document.createElement('style');
 		style.textContent = GATEWAY_STYLES;
@@ -81,19 +83,20 @@ export class GatewayPane extends ViewPane {
 
 		// Navigation items — each opens an editor tab
 		// allow-any-unicode-next-line
+		const iconBase = 'vs/workbench/contrib/devteam/browser/media/icons';
 		const navItems: NavItem[] = [
-			{ label: 'Overview', icon: '\uD83C\uDFE0', createInput: () => new OverviewEditorInput() },
-			{ label: 'Agents', icon: '\uD83E\uDD16', createInput: () => new AgentsEditorInput() },
-			{ label: 'Skills', icon: '\u26A1', createInput: () => new SkillsEditorInput() },
-			{ label: 'Tools', icon: '\uD83D\uDD27', createInput: () => new ToolsEditorInput() },
-			{ label: 'Sessions', icon: '\uD83D\uDCCB', createInput: () => new SessionsEditorInput() },
-			{ label: 'Models', icon: '\uD83E\uDDE0', createInput: () => new ModelsEditorInput() },
-			{ label: 'Config', icon: '\u2699', createInput: () => new ConfigEditorInput() },
-			{ label: 'Channels', icon: '\uD83D\uDCE1', createInput: () => new ChannelsEditorInput() },
-			{ label: 'Nodes', icon: '\uD83D\uDDA5', createInput: () => new NodesEditorInput() },
-			{ label: 'Cron Jobs', icon: '\u23F0', createInput: () => new CronEditorInput() },
-			{ label: 'Logs', icon: '\uD83D\uDCDC', createInput: () => new LogsEditorInput() },
-			{ label: 'Usage', icon: '\uD83D\uDCCA', createInput: () => new UsageEditorInput() },
+			{ label: 'Overview', icon: '\uD83C\uDFE0', iconImage: `${iconBase}/overview.png`, createInput: () => new OverviewEditorInput() },
+			{ label: 'Agents', icon: '\uD83E\uDD16', iconImage: `${iconBase}/agents.png`, createInput: () => new AgentsEditorInput() },
+			{ label: 'Skills', icon: '\u26A1', iconImage: `${iconBase}/skills.png`, createInput: () => new SkillsEditorInput() },
+			{ label: 'Tools', icon: '\uD83D\uDD27', iconImage: `${iconBase}/tools.png`, createInput: () => new ToolsEditorInput() },
+			{ label: 'Sessions', icon: '\uD83D\uDCCB', iconImage: `${iconBase}/sessions.png`, createInput: () => new SessionsEditorInput() },
+			{ label: 'Models', icon: '\uD83E\uDDE0', iconImage: `${iconBase}/models.png`, createInput: () => new ModelsEditorInput() },
+			{ label: 'Config', icon: '\u2699', iconImage: `${iconBase}/config.png`, createInput: () => new ConfigEditorInput() },
+			{ label: 'Channels', icon: '\uD83D\uDCE1', iconImage: `${iconBase}/channels.png`, createInput: () => new ChannelsEditorInput() },
+			{ label: 'Nodes', icon: '\uD83D\uDDA5', iconImage: `${iconBase}/nodes.png`, createInput: () => new NodesEditorInput() },
+			{ label: 'Cron Jobs', icon: '\u23F0', iconImage: `${iconBase}/cron.png`, createInput: () => new CronEditorInput() },
+			{ label: 'Logs', icon: '\uD83D\uDCDC', iconImage: `${iconBase}/logs.png`, createInput: () => new LogsEditorInput() },
+			{ label: 'Usage', icon: '\uD83D\uDCCA', iconImage: `${iconBase}/usage.png`, createInput: () => new UsageEditorInput() },
 		];
 
 		const nav = document.createElement('div');
@@ -103,9 +106,19 @@ export class GatewayPane extends ViewPane {
 			const btn = document.createElement('button');
 			btn.className = 'gw-nav-item';
 
-			const icon = document.createElement('span');
-			icon.className = 'gw-nav-icon';
-			icon.textContent = item.icon;
+			let icon: HTMLElement;
+			if (item.iconImage) {
+				const img = document.createElement('img');
+				img.className = 'gw-nav-icon gw-nav-icon-img';
+				img.src = FileAccess.asBrowserUri(item.iconImage as `vs/${string}`).toString(true);
+				img.alt = item.label;
+				img.draggable = false;
+				icon = img;
+			} else {
+				icon = document.createElement('span');
+				icon.className = 'gw-nav-icon';
+				icon.textContent = item.icon;
+			}
 
 			const label = document.createElement('span');
 			label.className = 'gw-nav-label';
@@ -222,7 +235,7 @@ const GATEWAY_STYLES = `
 
 	.gw-status {
 		display: flex; align-items: center; gap: 8px;
-		padding: 10px 0; border-bottom: 1px solid #2a2a3e; margin-bottom: 12px;
+		padding: 10px 0; border-bottom: 1px solid #2a3a3e; margin-bottom: 12px;
 	}
 
 	.gw-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -232,10 +245,10 @@ const GATEWAY_STYLES = `
 	.gw-status-text { color: #e0e0e0; font-size: 12px; flex: 1; }
 
 	.gw-refresh-btn {
-		padding: 2px 8px; background: transparent; border: 1px solid #2a2a3e;
+		padding: 2px 8px; background: transparent; border: 1px solid #2a3a3e;
 		border-radius: 3px; color: #808080; font-size: 11px; cursor: pointer;
 	}
-	.gw-refresh-btn:hover { border-color: #00d4ff; color: #00d4ff; }
+	.gw-refresh-btn:hover { border-color: #e85555; color: #e85555; }
 
 	.gw-nav { display: flex; flex-direction: column; gap: 2px; }
 
@@ -245,11 +258,12 @@ const GATEWAY_STYLES = `
 		border-radius: 4px; cursor: pointer; width: 100%; text-align: left;
 		transition: background 0.15s;
 	}
-	.gw-nav-item:hover { background: #1a1a2e; }
+	.gw-nav-item:hover { background: #1a2a2e; }
 
 	.gw-nav-icon { font-size: 16px; width: 24px; text-align: center; }
+	.gw-nav-icon-img { width: 24px; height: 24px; object-fit: contain; border-radius: 4px; }
 	.gw-nav-label { color: #e0e0e0; font-size: 13px; flex: 1; font-weight: 500; }
 	.gw-nav-arrow { color: #555; font-size: 16px; }
-	.gw-nav-item:hover .gw-nav-arrow { color: #00d4ff; }
-	.gw-nav-item:hover .gw-nav-label { color: #00d4ff; }
+	.gw-nav-item:hover .gw-nav-arrow { color: #e85555; }
+	.gw-nav-item:hover .gw-nav-label { color: #e85555; }
 `;

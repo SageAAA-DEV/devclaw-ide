@@ -96,7 +96,7 @@ function formatTokens(n: number): string {
 
 const STYLES = `
 .gw-sessions-root {
-	background: #0d0d1a;
+	background: #0f1a1e;
 	color: #e0e0e0;
 	height: 100%;
 	overflow-y: auto;
@@ -120,7 +120,7 @@ const STYLES = `
 
 .gw-sessions-badge {
 	background: rgba(0, 212, 255, 0.15);
-	color: #00d4ff;
+	color: #e85555;
 	font-size: 12px;
 	padding: 2px 10px;
 	border-radius: 12px;
@@ -140,7 +140,7 @@ const STYLES = `
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
 	color: #888;
-	border-bottom: 1px solid #1a1a2e;
+	border-bottom: 1px solid #1a2a2e;
 }
 
 .gw-sessions-table td {
@@ -155,7 +155,7 @@ const STYLES = `
 }
 
 .gw-sessions-key {
-	color: #00d4ff;
+	color: #e85555;
 	font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
 	font-size: 12px;
 }
@@ -175,7 +175,7 @@ const STYLES = `
 .gw-sessions-token-bar-bg {
 	width: 80px;
 	height: 6px;
-	background: #1a1a2e;
+	background: #1a2a2e;
 	border-radius: 3px;
 	overflow: hidden;
 	flex-shrink: 0;
@@ -438,7 +438,7 @@ export class SessionsEditorPane extends EditorPane {
 			barFill.style.width = `${pct}%`;
 			// Color gradient: cyan < 50%, orange 50-80%, red > 80%
 			if (pct < 50) {
-				barFill.style.background = '#00d4ff';
+				barFill.style.background = '#e85555';
 			} else if (pct < 80) {
 				barFill.style.background = '#f0a030';
 			} else {

@@ -141,7 +141,7 @@ export class OverviewEditorPane extends EditorPane {
 			//   defaultAgentId, agents: [{ agentId, isDefault, sessions: { count, recent } }],
 			//   sessions: { count, recent } }
 			const health = await this.rpcService.call<GatewayHealthResult>('health', {});
-			const healthPayload = health as Record<string, unknown>;
+			const healthPayload = health as unknown as Record<string, unknown>;
 
 			// Best-effort status call — may not exist on all gateways
 			let status: Record<string, unknown> = {};
@@ -293,7 +293,7 @@ export class OverviewEditorPane extends EditorPane {
 
 const OVERVIEW_EDITOR_STYLES = `
 	.gw-overview-root {
-		background: #0d0d1a;
+		background: #0f1a1e;
 		color: #e0e0e0;
 		font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 		overflow-y: auto;
@@ -302,12 +302,12 @@ const OVERVIEW_EDITOR_STYLES = `
 	}
 
 	.gw-overview-header {
-		color: #00d4ff;
+		color: #e85555;
 		font-size: 16px;
 		font-weight: 600;
 		margin-bottom: 20px;
 		padding-bottom: 10px;
-		border-bottom: 1px solid #2a2a3e;
+		border-bottom: 1px solid #2a3a3e;
 		letter-spacing: 0.3px;
 	}
 
@@ -318,7 +318,7 @@ const OVERVIEW_EDITOR_STYLES = `
 		margin-bottom: 24px;
 		padding: 12px 16px;
 		background: #12122a;
-		border: 1px solid #2a2a3e;
+		border: 1px solid #2a3a3e;
 		border-radius: 8px;
 	}
 
@@ -363,7 +363,7 @@ const OVERVIEW_EDITOR_STYLES = `
 
 	.gw-overview-card {
 		background: #12122a;
-		border: 1px solid #2a2a3e;
+		border: 1px solid #2a3a3e;
 		border-radius: 8px;
 		padding: 20px;
 		transition: border-color 0.15s, background 0.15s;
@@ -371,8 +371,8 @@ const OVERVIEW_EDITOR_STYLES = `
 	}
 
 	.gw-overview-card:hover {
-		border-color: #00d4ff44;
-		background: #00d4ff08;
+		border-color: #e8555544;
+		background: #e8555508;
 	}
 
 	.gw-overview-card-icon {
@@ -384,7 +384,7 @@ const OVERVIEW_EDITOR_STYLES = `
 	.gw-overview-card-value {
 		font-size: 28px;
 		font-weight: 700;
-		color: #00d4ff;
+		color: #e85555;
 		line-height: 1.2;
 		margin-bottom: 4px;
 	}

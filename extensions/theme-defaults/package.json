@@ -14,6 +14,12 @@
   "contributes": {
     "themes": [
       {
+        "id": "DevClaw Dark",
+        "label": "DevClaw Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/devclaw_dark.json"
+      },
+      {
         "id": "VS Code Light",
         "label": "%vsCodeLightThemeLabel%",
         "uiTheme": "vs",

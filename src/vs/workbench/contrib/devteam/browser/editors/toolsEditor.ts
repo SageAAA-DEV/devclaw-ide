@@ -33,7 +33,7 @@ interface IToolGroup {
 
 const TOOLS_EDITOR_STYLES = `
 .gw-tools-container {
-	background: #0d0d1a;
+	background: #0f1a1e;
 	color: #e0e0e0;
 	height: 100%;
 	overflow-y: auto;
@@ -109,7 +109,7 @@ const TOOLS_EDITOR_STYLES = `
 .gw-tools-group-badge {
 	font-size: 11px;
 	font-weight: 500;
-	color: #00d4ff;
+	color: #e85555;
 	background: rgba(0, 212, 255, 0.12);
 	padding: 2px 8px;
 	border-radius: 10px;
@@ -138,7 +138,7 @@ const TOOLS_EDITOR_STYLES = `
 .gw-tools-row-name {
 	font-size: 13px;
 	font-weight: 500;
-	color: #00d4ff;
+	color: #e85555;
 	font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 	min-width: 120px;
 }

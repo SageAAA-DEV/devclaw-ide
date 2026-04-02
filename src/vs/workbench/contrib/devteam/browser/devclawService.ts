@@ -140,7 +140,7 @@ export class DevClawService extends Disposable implements IDevClawService {
 			const idempotencyKey = crypto.randomUUID();
 
 			// Send chat message via WebSocket RPC — async, returns runId
-			const sendResult = await this.gatewayRpc.call<{ runId: string; status: string }>('chat.send', {
+			await this.gatewayRpc.call<{ runId: string; status: string }>('chat.send', {
 				sessionKey,
 				idempotencyKey,
 				message,

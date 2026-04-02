@@ -102,8 +102,8 @@ export class DevTeamTabBar extends Disposable {
 				display: flex;
 				align-items: center;
 				height: 36px;
-				background: #1a1a2e;
-				border-bottom: 1px solid #2a2a3e;
+				background: #1a2a2e;
+				border-bottom: 1px solid #2a3a3e;
 				padding: 0 8px;
 				flex-shrink: 0;
 				z-index: 100;
@@ -131,8 +131,8 @@ export class DevTeamTabBar extends Disposable {
 			}
 
 			.devteam-tab.active {
-				color: #00d4ff;
-				border-bottom-color: #00d4ff;
+				color: #e85555;
+				border-bottom-color: #e85555;
 			}
 		`;
 		this.container.appendChild(style);

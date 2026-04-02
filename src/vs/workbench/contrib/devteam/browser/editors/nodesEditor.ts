@@ -228,7 +228,7 @@ export class NodesEditorPane extends EditorPane {
 
 const NODES_EDITOR_STYLES = `
 	.gw-nodes-root {
-		background: #0d0d1a;
+		background: #0f1a1e;
 		color: #e0e0e0;
 		font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 		overflow-y: auto;
@@ -237,12 +237,12 @@ const NODES_EDITOR_STYLES = `
 	}
 
 	.gw-nodes-header {
-		color: #00d4ff;
+		color: #e85555;
 		font-size: 16px;
 		font-weight: 600;
 		margin-bottom: 20px;
 		padding-bottom: 10px;
-		border-bottom: 1px solid #2a2a3e;
+		border-bottom: 1px solid #2a3a3e;
 		letter-spacing: 0.3px;
 	}
 
@@ -254,14 +254,14 @@ const NODES_EDITOR_STYLES = `
 
 	.gw-nodes-card {
 		background: #13132a;
-		border: 1px solid #2a2a3e;
+		border: 1px solid #2a3a3e;
 		border-radius: 8px;
 		padding: 16px;
 		transition: border-color 0.15s, background 0.15s;
 	}
 
 	.gw-nodes-card:hover {
-		border-color: #00d4ff44;
+		border-color: #e8555544;
 		background: #16163a;
 	}
 
@@ -300,9 +300,9 @@ const NODES_EDITOR_STYLES = `
 		border-radius: 4px;
 		font-size: 11px;
 		font-weight: 500;
-		color: #00d4ff;
-		background: #00d4ff14;
-		border: 1px solid #00d4ff33;
+		color: #e85555;
+		background: #e8555514;
+		border: 1px solid #e8555533;
 		margin-bottom: 12px;
 	}
 

@@ -23,6 +23,11 @@
 	"win32arm64UserAppId": "{{D4E5F6A7-B8C9-0123-DEFA-234567890123}",
 	"win32AppUserModelId": "OpenClaw.IDE",
 	"win32ShellNameShort": "Dev&Claw",
+	"win32ContextMenu": {
+		"x64": { "clsid": "{E1F2A3B4-C5D6-7890-ABCD-1234567890EF}" },
+		"arm64": { "clsid": "{F2A3B4C5-D6E7-8901-BCDE-234567890FA1}" }
+	},
+	"win32NameVersion": "DevClaw IDE 2026.4.1",
 	"win32TunnelServiceMutex": "devclaw-tunnelservice",
 	"win32TunnelMutex": "devclaw-tunnel",
 	"darwinBundleIdentifier": "com.openclaw.ide",

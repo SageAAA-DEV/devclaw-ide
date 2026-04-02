@@ -29,7 +29,7 @@ export class DevTeamPanelManager extends Disposable {
 			left: 0;
 			right: 0;
 			bottom: 0;
-			background: #0d0d1a;
+			background: #0f1a1e;
 			z-index: 50;
 		`;
 
@@ -58,7 +58,7 @@ export class DevTeamPanelManager extends Disposable {
 		const heading = document.createElement('h1');
 		heading.textContent = title;
 		heading.style.cssText = `
-			color: #00d4ff;
+			color: #e85555;
 			font-size: 24px;
 			font-weight: 600;
 			margin: 0 0 16px 0;

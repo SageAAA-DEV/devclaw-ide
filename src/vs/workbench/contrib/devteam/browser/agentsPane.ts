@@ -92,7 +92,7 @@ export class DevClawAgentsPane extends ViewPane {
 		container.style.cssText = `
 			display: flex;
 			flex-direction: column;
-			background: #0d0d1a;
+			background: #0f1a1e;
 			height: 100%;
 			font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 		`;
@@ -253,7 +253,7 @@ const AGENTS_STYLES = `
 		align-items: center;
 		justify-content: space-between;
 		padding: 8px 12px;
-		border-bottom: 1px solid #2a2a3e;
+		border-bottom: 1px solid #2a3a3e;
 		flex-shrink: 0;
 	}
 
@@ -264,14 +264,14 @@ const AGENTS_STYLES = `
 	.devclaw-btn-refresh {
 		padding: 3px 10px;
 		background: transparent;
-		border: 1px solid #2a2a3e;
+		border: 1px solid #2a3a3e;
 		border-radius: 3px;
 		color: #808080;
 		font-family: inherit;
 		font-size: 11px;
 		cursor: pointer;
 	}
-	.devclaw-btn-refresh:hover { color: #00d4ff; border-color: #00d4ff33; }
+	.devclaw-btn-refresh:hover { color: #e85555; border-color: #e8555533; }
 
 	.devclaw-agents-list { flex: 1; overflow-y: auto; padding: 8px; }
 
@@ -280,13 +280,13 @@ const AGENTS_STYLES = `
 		align-items: center;
 		gap: 10px;
 		padding: 10px 12px;
-		border: 1px solid #2a2a3e;
+		border: 1px solid #2a3a3e;
 		border-radius: 6px;
 		margin-bottom: 6px;
 		cursor: pointer;
 		transition: border-color 0.15s, background 0.15s;
 	}
-	.devclaw-agent-card:hover { border-color: #00d4ff44; background: #00d4ff08; }
+	.devclaw-agent-card:hover { border-color: #e8555544; background: #e8555508; }
 	.devclaw-agent-card.active { border-color: #4caf50; background: #4caf5010; }
 
 	.devclaw-agent-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -317,15 +317,15 @@ const AGENTS_STYLES = `
 	.devclaw-agent-chat-btn {
 		padding: 4px 12px;
 		background: transparent;
-		border: 1px solid #00d4ff33;
+		border: 1px solid #e8555533;
 		border-radius: 3px;
-		color: #00d4ff;
+		color: #e85555;
 		font-family: inherit;
 		font-size: 11px;
 		cursor: pointer;
 		flex-shrink: 0;
 	}
-	.devclaw-agent-chat-btn:hover { background: #00d4ff11; }
+	.devclaw-agent-chat-btn:hover { background: #e8555511; }
 
 	.devclaw-marketplace-teaser {
 		text-align: center;
@@ -333,10 +333,10 @@ const AGENTS_STYLES = `
 		color: #555;
 		font-size: 12px;
 		cursor: pointer;
-		border: 1px dashed #2a2a3e;
+		border: 1px dashed #2a3a3e;
 		border-radius: 6px;
 		margin-top: 8px;
 		transition: color 0.15s, border-color 0.15s;
 	}
-	.devclaw-marketplace-teaser:hover { color: #00d4ff; border-color: #00d4ff44; }
+	.devclaw-marketplace-teaser:hover { color: #e85555; border-color: #e8555544; }
 `;

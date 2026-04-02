@@ -260,7 +260,7 @@ export class SkillsEditorPane extends EditorPane {
 		const style = document.createElement('style');
 		style.textContent = `
 			.gw-skills-root {
-				background: #0d0d1a;
+				background: #0f1a1e;
 				color: #e0e0e0;
 				overflow-y: auto;
 				padding: 32px 40px;
@@ -305,7 +305,7 @@ export class SkillsEditorPane extends EditorPane {
 				transition: border-color 0.15s ease, box-shadow 0.15s ease;
 			}
 			.gw-skills-card:hover {
-				border-color: #00d4ff;
+				border-color: #e85555;
 				box-shadow: 0 0 12px rgba(0, 212, 255, 0.15);
 			}
 			.gw-skills-card--disabled {
@@ -334,7 +334,7 @@ export class SkillsEditorPane extends EditorPane {
 				padding: 2px 8px;
 				border-radius: 4px;
 				background: rgba(0, 212, 255, 0.12);
-				color: #00d4ff;
+				color: #e85555;
 				text-transform: uppercase;
 				letter-spacing: 0.5px;
 			}
@@ -371,7 +371,7 @@ export class SkillsEditorPane extends EditorPane {
 			}
 			.gw-skills-toggle-track--on::after {
 				transform: translateX(16px);
-				background: #00d4ff;
+				background: #e85555;
 			}
 			.gw-skills-toggle-label {
 				font-size: 11px;

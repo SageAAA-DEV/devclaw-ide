@@ -21,7 +21,7 @@ import { splitRecentLabel } from '../../../../base/common/labels.js';
 import { DisposableStore, toDisposable } from '../../../../base/common/lifecycle.js';
 import { ILink, LinkedText } from '../../../../base/common/linkedText.js';
 import { parse } from '../../../../base/common/marshalling.js';
-import { Schemas, matchesScheme } from '../../../../base/common/network.js';
+import { FileAccess, Schemas, matchesScheme } from '../../../../base/common/network.js';
 import { OS } from '../../../../base/common/platform.js';
 import { ThemeIcon } from '../../../../base/common/themables.js';
 import { assertReturnsDefined } from '../../../../base/common/types.js';
@@ -919,9 +919,15 @@ export class GettingStartedPage extends EditorPane {
 			onShowOnStartupChanged();
 		}));
 
-		const header = $('.header', {},
-			$('h1.product-name.caption', {}, this.productService.nameLong),
-			$('p.subtitle.description', {}, localize({ key: 'gettingStarted.editingEvolved', comment: ['Shown as subtitle on the Welcome page.'] }, "Editing evolved"))
+		const mascotImg = $('img.openclaw-mascot', { src: FileAccess.asBrowserUri('vs/workbench/contrib/welcomeGettingStarted/browser/media/openclaw-mascot.svg').toString(true), alt: 'OpenClaw', draggable: false });
+		const brandName = $('h1.product-name.caption.openclaw-gradient', {}, 'OpenClaw');
+		const tagline = $('p.subtitle.description.openclaw-tagline', {}, 'THE AI THAT ACTUALLY DOES THINGS.');
+		const subtitle = $('p.subtitle.description.openclaw-subtitle', {}, 'Now lives where you do your work!');
+		const header = $('.header.openclaw-header', {},
+			mascotImg,
+			brandName,
+			tagline,
+			subtitle,
 		);
 
 		const leftColumn = $('.categories-column.categories-column-left', {},);
@@ -931,7 +937,25 @@ export class GettingStartedPage extends EditorPane {
 		const recentList = this.buildRecentlyOpenedList();
 		const gettingStartedList = this.buildGettingStartedWalkthroughsList();
 
+		const devclavBrand = $('p.devclaw-footer-brand', {},
+			$('span.devclaw-footer-dev', {}, 'Dev'),
+			$('span.devclaw-footer-claw', {}, 'Claw'),
+			$('span.devclaw-footer-edition', {}, ' IDE'),
+		);
+		const lineage = $('p.devclaw-footer-lineage', {},
+			$('span', {}, 'Built on VS Code \u00B7 Powered by OpenClaw'),
+		);
+		const builtBy = $('p.devclaw-footer-builtby', {},
+			$('span', {}, 'built by SageAAA'),
+		);
+		const sageLink = $('p.devclaw-footer-sagelink', {},
+			$('a', { href: 'https://www.sageaaa.com', tabIndex: 0 }, 'www.SageAAA.com'),
+		);
 		const footer = $('.footer', {},
+			devclavBrand,
+			lineage,
+			builtBy,
+			sageLink,
 			$('p.showOnStartup', {},
 				showOnStartupCheckbox.domNode,
 				showOnStartupLabel,

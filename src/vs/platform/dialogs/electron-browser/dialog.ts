@@ -33,8 +33,9 @@ export function createNativeAboutDialogDetails(productService: IProductService, 
 		);
 	};
 
-	const details = getDetails(true);
-	const detailsToCopy = getDetails(false);
+	const brandLine = 'Built on VS Code \u00B7 Powered by OpenClaw\nwww.SageAAA.com';
+	const details = `${brandLine}\n\n${getDetails(true)}`;
+	const detailsToCopy = `${brandLine}\n\n${getDetails(false)}`;
 
 	return {
 		title: productService.nameLong,

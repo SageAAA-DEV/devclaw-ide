@@ -53,8 +53,8 @@ const WIZARD_STYLES = `
 }
 
 .devteam-wizard-card {
-	background: #0d0d1a;
-	border: 1px solid #2a2a3e;
+	background: #0f1a1e;
+	border: 1px solid #2a3a3e;
 	border-radius: 12px;
 	padding: 40px 48px;
 	width: 480px;
@@ -66,7 +66,7 @@ const WIZARD_STYLES = `
 }
 
 .devteam-wizard-header {
-	color: #00d4ff;
+	color: #e85555;
 	font-size: 24px;
 	font-weight: 700;
 	margin: 0;
@@ -91,7 +91,7 @@ const WIZARD_STYLES = `
 .devteam-wizard-input {
 	width: 100%;
 	background: #111125;
-	border: 1px solid #2a2a3e;
+	border: 1px solid #2a3a3e;
 	border-radius: 6px;
 	color: #e0e0e0;
 	font-family: inherit;
@@ -106,17 +106,17 @@ const WIZARD_STYLES = `
 
 .devteam-wizard-select:focus,
 .devteam-wizard-input:focus {
-	border-color: #00d4ff;
+	border-color: #e85555;
 }
 
 .devteam-wizard-select option {
-	background: #0d0d1a;
+	background: #0f1a1e;
 }
 
 .devteam-wizard-btn {
 	width: 100%;
-	background: #00d4ff;
-	color: #0d0d1a;
+	background: #e85555;
+	color: #0f1a1e;
 	border: none;
 	border-radius: 6px;
 	font-family: inherit;
@@ -154,7 +154,7 @@ const WIZARD_STYLES = `
 }
 
 .devteam-wizard-status.success {
-	color: #00d4ff;
+	color: #e85555;
 }
 
 .devteam-wizard-footer {
@@ -165,7 +165,7 @@ const WIZARD_STYLES = `
 	color: #808080;
 	font-size: 12px;
 	text-decoration: none;
-	border-bottom: 1px dashed #2a2a3e;
+	border-bottom: 1px dashed #2a3a3e;
 	cursor: pointer;
 	background: none;
 	border-top: none;
