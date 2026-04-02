@@ -17,7 +17,7 @@ import { IThemeService } from '../../../../platform/theme/common/themeService.js
 import { IHoverService } from '../../../../platform/hover/browser/hover.js';
 import { IStorageService, StorageScope } from '../../../../platform/storage/common/storage.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
-import { FileAccess } from '../../../../base/common/network.js';
+import { ICON_OVERVIEW, ICON_AGENTS, ICON_SKILLS, ICON_TOOLS, ICON_SESSIONS, ICON_MODELS, ICON_CONFIG, ICON_CHANNELS, ICON_NODES, ICON_CRON, ICON_LOGS, ICON_USAGE } from './media/icons/iconData.js';
 import { OpenClawRpcClient } from '../common/openClawRpcClient.js';
 import type { GatewayHealthResult } from '../common/gatewayTypes.js';
 import { EditorInput } from '../../../common/editor/editorInput.js';
@@ -82,21 +82,19 @@ export class GatewayPane extends ViewPane {
 		content.appendChild(this.createStatusSection());
 
 		// Navigation items — each opens an editor tab
-		// allow-any-unicode-next-line
-		const iconBase = 'vs/workbench/contrib/devteam/browser/media/icons';
 		const navItems: NavItem[] = [
-			{ label: 'Overview', icon: '\uD83C\uDFE0', iconImage: `${iconBase}/overview.png`, createInput: () => new OverviewEditorInput() },
-			{ label: 'Agents', icon: '\uD83E\uDD16', iconImage: `${iconBase}/agents.png`, createInput: () => new AgentsEditorInput() },
-			{ label: 'Skills', icon: '\u26A1', iconImage: `${iconBase}/skills.png`, createInput: () => new SkillsEditorInput() },
-			{ label: 'Tools', icon: '\uD83D\uDD27', iconImage: `${iconBase}/tools.png`, createInput: () => new ToolsEditorInput() },
-			{ label: 'Sessions', icon: '\uD83D\uDCCB', iconImage: `${iconBase}/sessions.png`, createInput: () => new SessionsEditorInput() },
-			{ label: 'Models', icon: '\uD83E\uDDE0', iconImage: `${iconBase}/models.png`, createInput: () => new ModelsEditorInput() },
-			{ label: 'Config', icon: '\u2699', iconImage: `${iconBase}/config.png`, createInput: () => new ConfigEditorInput() },
-			{ label: 'Channels', icon: '\uD83D\uDCE1', iconImage: `${iconBase}/channels.png`, createInput: () => new ChannelsEditorInput() },
-			{ label: 'Nodes', icon: '\uD83D\uDDA5', iconImage: `${iconBase}/nodes.png`, createInput: () => new NodesEditorInput() },
-			{ label: 'Cron Jobs', icon: '\u23F0', iconImage: `${iconBase}/cron.png`, createInput: () => new CronEditorInput() },
-			{ label: 'Logs', icon: '\uD83D\uDCDC', iconImage: `${iconBase}/logs.png`, createInput: () => new LogsEditorInput() },
-			{ label: 'Usage', icon: '\uD83D\uDCCA', iconImage: `${iconBase}/usage.png`, createInput: () => new UsageEditorInput() },
+			{ label: 'Overview', icon: '\uD83C\uDFE0', iconImage: ICON_OVERVIEW, createInput: () => new OverviewEditorInput() },
+			{ label: 'Agents', icon: '\uD83E\uDD16', iconImage: ICON_AGENTS, createInput: () => new AgentsEditorInput() },
+			{ label: 'Skills', icon: '\u26A1', iconImage: ICON_SKILLS, createInput: () => new SkillsEditorInput() },
+			{ label: 'Tools', icon: '\uD83D\uDD27', iconImage: ICON_TOOLS, createInput: () => new ToolsEditorInput() },
+			{ label: 'Sessions', icon: '\uD83D\uDCCB', iconImage: ICON_SESSIONS, createInput: () => new SessionsEditorInput() },
+			{ label: 'Models', icon: '\uD83E\uDDE0', iconImage: ICON_MODELS, createInput: () => new ModelsEditorInput() },
+			{ label: 'Config', icon: '\u2699', iconImage: ICON_CONFIG, createInput: () => new ConfigEditorInput() },
+			{ label: 'Channels', icon: '\uD83D\uDCE1', iconImage: ICON_CHANNELS, createInput: () => new ChannelsEditorInput() },
+			{ label: 'Nodes', icon: '\uD83D\uDDA5', iconImage: ICON_NODES, createInput: () => new NodesEditorInput() },
+			{ label: 'Cron Jobs', icon: '\u23F0', iconImage: ICON_CRON, createInput: () => new CronEditorInput() },
+			{ label: 'Logs', icon: '\uD83D\uDCDC', iconImage: ICON_LOGS, createInput: () => new LogsEditorInput() },
+			{ label: 'Usage', icon: '\uD83D\uDCCA', iconImage: ICON_USAGE, createInput: () => new UsageEditorInput() },
 		];
 
 		const nav = document.createElement('div');
@@ -110,7 +108,7 @@ export class GatewayPane extends ViewPane {
 			if (item.iconImage) {
 				const img = document.createElement('img');
 				img.className = 'gw-nav-icon gw-nav-icon-img';
-				img.src = FileAccess.asBrowserUri(item.iconImage as `vs/${string}`).toString(true);
+				img.src = item.iconImage;
 				img.alt = item.label;
 				img.draggable = false;
 				icon = img;
