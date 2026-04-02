@@ -1,44 +1,29 @@
 # Security Policy
 
-## Reporting a Vulnerability
+## Reporting Security Vulnerabilities
 
-If you discover a security vulnerability in DevClaw, please report it responsibly.
+We take security seriously. If you find a security vulnerability, please report it responsibly.
 
-**Do not open a public GitHub issue for security vulnerabilities.**
+**Do NOT report security issues through public GitHub issues.**
 
-Instead, email **security@sageaaa.com** with:
+### How to Report
 
-1. A description of the vulnerability
-2. Steps to reproduce
-3. Impact assessment (what an attacker could achieve)
-4. Any suggested fix (optional)
+Email: security@sageaaa.com
 
-We will acknowledge your report within 48 hours and aim to provide a fix or mitigation within 7 days for critical issues.
+We aim to respond within 48 hours.
 
-## Scope
+## Supported Versions
 
-This policy covers:
+| Version | Supported          |
+| ------- | ------------------ |
+| 1.x.x   | ✅ Active Support |
 
-- The DevClaw IDE application (this repository)
-- Built-in extensions shipped with DevClaw (`extensions/devclaw-*`)
-- The OpenClaw gateway integration layer
+## Security Best Practices
 
-This policy does **not** cover:
+- Keep your API keys secure — never commit them to the repo
+- Run the OpenClaw gateway locally for maximum privacy
+- Review agent permissions before granting tool access
 
-- The upstream Code-OSS / VS Code platform (report those to [Microsoft](https://aka.ms/SECURITY.md))
-- Third-party extensions installed by users
-- Your own OpenClaw gateway deployment
+---
 
-## Security Design
-
-- **Telemetry is off by default** — No data leaves your machine unless you opt in
-- **No hardcoded secrets** — API keys are stored in user-local application storage
-- **Copilot blocked** — GitHub Copilot extensions cannot be imported
-- **Path traversal protection** — Agent code-apply operations are sandboxed to the workspace
-- **Local-first** — The OpenClaw gateway runs on localhost by default
-
-## Best Practices for Users
-
-- Do not share your `.devclaw/` config directory — it may contain API keys
-- Secure your local OpenClaw gateway if exposing it beyond localhost
-- Review agent-generated code before applying to sensitive files
+Built with 🔒 by [SageAAA](https://sageaaa.com)
