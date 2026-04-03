@@ -189,10 +189,6 @@
 }
 
 .monaco-workbench .part.editor > .content .gettingStartedContainer .header.openclaw-header h1.openclaw-gradient {
-	background: linear-gradient(90deg, #e84040 0%, #e84040 40%, #888 70%, #666 100%);
-	-webkit-background-clip: text;
-	-webkit-text-fill-color: transparent;
-	background-clip: text;
 	font-size: 3em;
 	font-weight: 700;
 	letter-spacing: -0.02em;
@@ -200,6 +196,14 @@
 	padding: 0;
 	line-height: 1.1;
 	white-space: nowrap;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .header.openclaw-header .devclaw-header-dev {
+	color: #e84040;
+}
+
+.monaco-workbench .part.editor > .content .gettingStartedContainer .header.openclaw-header .devclaw-header-claw {
+	color: var(--vscode-foreground);
 }
 
 .monaco-workbench .part.editor > .content .gettingStartedContainer .header.openclaw-header .openclaw-tagline {

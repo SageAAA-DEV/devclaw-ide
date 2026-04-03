@@ -919,10 +919,13 @@ export class GettingStartedPage extends EditorPane {
 			onShowOnStartupChanged();
 		}));
 
-		const mascotImg = $('img.openclaw-mascot', { src: FileAccess.asBrowserUri('vs/workbench/contrib/welcomeGettingStarted/browser/media/openclaw-mascot.svg').toString(true), alt: 'OpenClaw', draggable: false });
-		const brandName = $('h1.product-name.caption.openclaw-gradient', {}, 'OpenClaw');
-		const tagline = $('p.subtitle.description.openclaw-tagline', {}, 'THE AI THAT ACTUALLY DOES THINGS.');
-		const subtitle = $('p.subtitle.description.openclaw-subtitle', {}, 'Now lives where you do your work!');
+		const mascotImg = $('img.openclaw-mascot', { src: FileAccess.asBrowserUri('vs/workbench/contrib/welcomeGettingStarted/browser/media/openclaw-mascot.svg').toString(true), alt: 'DevClaw', draggable: false });
+		const brandName = $('h1.product-name.caption.openclaw-gradient', {},
+			$('span.devclaw-header-dev', {}, 'Dev'),
+			$('span.devclaw-header-claw', {}, 'Claw'),
+		);
+		const tagline = $('p.subtitle.description.openclaw-tagline', {}, 'THE AI-POWERED IDE THAT ACTUALLY DOES THINGS.');
+		const subtitle = $('p.subtitle.description.openclaw-subtitle', {}, 'Powered by OpenClaw');
 		const header = $('.header.openclaw-header', {},
 			mascotImg,
 			brandName,
